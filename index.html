@@ -65,27 +65,6 @@
       </span>
     </section>
 
-    <!-- ───── Manifesto strip ───── -->
-    <section class="manifesto" aria-label="Operating thesis">
-      <div class="container">
-        <p class="manifesto-meta">— Operating thesis</p>
-        <p class="manifesto-line" id="manifesto">
-          <span class="word">We</span>
-          <span class="word">build</span>
-          <span class="word">businesses</span>
-          <span class="word">that</span>
-          <span class="word">earn</span>
-          <span class="word">trust</span>
-          <span class="word">from</span>
-          <span class="word">the</span>
-          <span class="word">people</span>
-          <span class="word">they</span>
-          <span class="word">serve&nbsp;—</span>
-          <span class="word"><em>and&nbsp;keep&nbsp;it.</em></span>
-        </p>
-      </div>
-    </section>
-
     <!-- ───── Portfolio ───── -->
     <section class="portfolio" aria-labelledby="portfolio-label">
       <div class="container">
@@ -286,23 +265,6 @@
       });
     }, { threshold: 0.18, rootMargin: '0px 0px -10% 0px' });
     document.querySelectorAll('.reveal, .section-label').forEach(el => io.observe(el));
-
-    /* ───── Manifesto: word-by-word lit on scroll ───── */
-    const manifesto = document.getElementById('manifesto');
-    if (manifesto) {
-      const words = manifesto.querySelectorAll('.word');
-      const onMani = () => {
-        const r = manifesto.getBoundingClientRect();
-        const vh = window.innerHeight;
-        const start = vh * 0.85;
-        const end = vh * 0.25;
-        const progress = Math.max(0, Math.min(1, (start - r.top) / (start - end)));
-        const lit = Math.floor(progress * words.length);
-        words.forEach((w, i) => w.classList.toggle('lit', i < lit));
-      };
-      window.addEventListener('scroll', onMani, { passive: true });
-      onMani();
-    }
 
     /* ───── Card radial-glow follows pointer ───── */
     document.querySelectorAll('.card').forEach(card => {
