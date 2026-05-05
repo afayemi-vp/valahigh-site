@@ -1,10 +1,10 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Valahigh Co LLC</title>
-  <meta name="description" content="A Houston-based holding company building durable companies in sports technology and beyond." />
+  <meta name="description" content="Valahigh Co LLC is a Houston-based holding company. We invest in and operate businesses where domain insight and disciplined product thinking create lasting advantages." />
   <meta property="og:title" content="Valahigh Co LLC" />
   <meta property="og:description" content="A Houston-based holding company building durable companies in sports technology and beyond." />
   <meta property="og:type" content="website" />
@@ -12,109 +12,309 @@
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
+
+  <div class="grain" aria-hidden="true"></div>
+  <div class="cursor" aria-hidden="true"></div>
+
   <header class="site-header">
     <div class="container">
-      <div class="logo">Valahigh</div>
+      <a class="brand-lockup" href="/" aria-label="Valahigh Co LLC — home" data-cursor="hover">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+            <path d="M44 38 L66 38 L100 138 L134 38 L156 38 L156 44 L148 44 L106 168 L100 178 L94 168 L52 44 L44 44 Z" fill="currentColor"/>
+          </svg>
+        </span>
+        <span class="brand-word">Valahigh</span>
+      </a>
+      <span class="header-meta">
+        <span class="dot" aria-hidden="true"></span>
+        Houston · MMXXVI
+      </span>
     </div>
   </header>
 
-  <section class="hero">
-    <div class="container">
-      <h1>
-        Building durable companies <br/>
-        <span class="hero-emph">in sports and beyond.</span>
-      </h1>
-      <p class="lede">
-        Valahigh Co LLC is a Houston-based holding company. We invest
-        in and operate businesses where domain insight and disciplined
-        product thinking create lasting advantages.
-      </p>
-    </div>
-  </section>
+  <main>
 
-  <section class="portfolio">
-    <div class="container">
-      <div class="section-label">Our work</div>
-      <div class="cards">
-        <a href="https://clearifi.us" class="card card-primary" target="_blank" rel="noopener">
-          <div class="card-mark">Clearifi</div>
-          <div class="card-tagline">Sports / Recruiting Intelligence</div>
-          <p>
-            A basketball recruiting intelligence platform built for the
-            players they overlooked. Clearifi gives high school and
-            college athletes data-driven clarity on where they fit,
-            where they can grow, and how to get there — across every
-            level of college basketball.
-          </p>
-          <span class="card-link">Visit clearifi.us →</span>
-        </a>
-        <div class="card card-secondary">
-          <div class="card-mark">Praxian</div>
-          <div class="card-tagline">Strategy / Transformation</div>
-          <p>
-            A boutique consulting practice working with leadership
-            teams on business transformation, operational strategy,
-            and AI integration.
-          </p>
-          <span class="card-link card-muted">Available for select engagements</span>
+    <!-- ───── Hero ───── -->
+    <section class="hero" aria-labelledby="hero-headline">
+      <div class="field" id="field" aria-hidden="true"></div>
+      <div class="container">
+        <p class="hero-eyebrow">Valahigh Co LLC &nbsp;·&nbsp; A holding company</p>
+        <h1 id="hero-headline" class="hero-headline">
+          <span class="word"><span class="word-inner" style="animation-delay:.35s">Building</span></span>
+          <span class="word"><span class="word-inner" style="animation-delay:.45s">durable</span></span>
+          <span class="word"><span class="word-inner" style="animation-delay:.55s">companies</span></span>
+          <span class="word"><span class="word-inner accent" style="animation-delay:.8s">in&nbsp;sports</span></span>
+          <span class="word"><span class="word-inner accent" style="animation-delay:.95s">and&nbsp;beyond.</span></span>
+        </h1>
+        <p class="hero-dek">
+          Valahigh Co LLC is a Houston-based holding company. We invest in and operate businesses where domain insight and disciplined product thinking create lasting advantages.
+        </p>
+      </div>
+      <span class="hero-scroll" aria-hidden="true">
+        <span class="line"></span>
+        Scroll
+      </span>
+      <span class="hero-tick" aria-hidden="true">
+        Est. <span class="v">MMXXVI</span><br/>
+        29.7604° N · 95.3698° W
+      </span>
+    </section>
+
+    <!-- ───── Manifesto strip ───── -->
+    <section class="manifesto" aria-label="Operating thesis">
+      <div class="container">
+        <p class="manifesto-meta">— Operating thesis</p>
+        <p class="manifesto-line" id="manifesto">
+          <span class="word">We</span>
+          <span class="word">build</span>
+          <span class="word">businesses</span>
+          <span class="word">that</span>
+          <span class="word">earn</span>
+          <span class="word">trust</span>
+          <span class="word">from</span>
+          <span class="word">the</span>
+          <span class="word">people</span>
+          <span class="word">they</span>
+          <span class="word">serve&nbsp;—</span>
+          <span class="word"><em>and&nbsp;keep</em></span>
+          <span class="word"><em>it.</em></span>
+        </p>
+      </div>
+    </section>
+
+    <!-- ───── Portfolio ───── -->
+    <section class="portfolio" aria-labelledby="portfolio-label">
+      <div class="container">
+        <div class="section-label reveal">
+          <span class="lbl-num">i.</span>
+          <span class="lbl" id="portfolio-label">Our work</span>
+          <span class="rule" aria-hidden="true"></span>
+          <span class="index">Two operating units</span>
+        </div>
+
+        <div class="portfolio-grid">
+
+          <article class="card primary reveal" data-cursor="hover" data-tilt>
+            <div class="card-bg" aria-hidden="true"></div>
+            <p class="card-tagline">
+              <span class="pill live">● Operating</span>
+              Sports / Recruiting Intelligence
+            </p>
+            <h2 class="card-mark">Clear<span class="ital">i</span>fi</h2>
+            <p class="card-body">
+              A basketball recruiting intelligence platform built for the players they overlooked. Clearifi gives high school and college athletes data-driven clarity on where they fit, where they can grow, and how to get there — across every level of college basketball.
+            </p>
+            <div class="card-stat">
+              <div class="stat"><span class="num">5</span><span class="lbl">Divisions covered</span></div>
+              <div class="stat"><span class="num">350+</span><span class="lbl">NCAA programs</span></div>
+              <div class="stat"><span class="num">2025</span><span class="lbl">Founded</span></div>
+            </div>
+            <div class="card-foot">
+              <a class="card-link" href="https://clearifi.us" target="_blank" rel="noopener noreferrer" data-cursor="accent">
+                Visit clearifi.us <span class="arrow" aria-hidden="true">→</span>
+              </a>
+              <span class="card-meta">Primary asset</span>
+            </div>
+          </article>
+
+          <article class="card reveal" data-delay="1" data-cursor="hover" data-tilt>
+            <div class="card-bg" aria-hidden="true"></div>
+            <p class="card-tagline">
+              <span class="pill">By referral</span>
+              Strategy / Transformation
+            </p>
+            <h2 class="card-mark">Prax<span class="ital">i</span>an</h2>
+            <p class="card-body">
+              A boutique consulting practice working with leadership teams on business transformation, operational strategy, and AI integration.
+            </p>
+            <div class="card-foot">
+              <span class="card-link muted">Available for select engagements</span>
+              <span class="card-meta">Secondary</span>
+            </div>
+          </article>
+
         </div>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <section class="approach">
-    <div class="container">
-      <div class="section-label">How we operate</div>
-      <div class="principles">
-        <div class="principle">
-          <div class="principle-number">01</div>
-          <h3>Domain insight first.</h3>
-          <p>
-            Every business we build starts from earned understanding
-            of the people and structures it serves.
-          </p>
+    <!-- ───── Approach ───── -->
+    <section class="approach" aria-labelledby="approach-label">
+      <div class="container">
+        <div class="section-label reveal">
+          <span class="lbl-num">ii.</span>
+          <span class="lbl" id="approach-label">How we operate</span>
+          <span class="rule" aria-hidden="true"></span>
+          <span class="index">Three principles</span>
         </div>
-        <div class="principle">
-          <div class="principle-number">02</div>
-          <h3>Capital efficient by design.</h3>
-          <p>
-            We build with constraint. Tight teams, real revenue,
-            no burn-for-burn's-sake.
-          </p>
-        </div>
-        <div class="principle">
-          <div class="principle-number">03</div>
-          <h3>Long horizons.</h3>
-          <p>
-            We invest in companies whose value compounds. Time is
-            the strategy, not the obstacle.
-          </p>
+
+        <div class="principles">
+
+          <div class="principle reveal" data-cursor="hover">
+            <div class="principle-num">01<span class="dot">.</span></div>
+            <h3 class="principle-heading">Domain insight first.</h3>
+            <p class="principle-body">
+              Every business we build starts from earned understanding of the people and structures it serves.
+            </p>
+          </div>
+
+          <div class="principle reveal" data-delay="1" data-cursor="hover">
+            <div class="principle-num">02<span class="dot">.</span></div>
+            <h3 class="principle-heading">Capital efficient by design.</h3>
+            <p class="principle-body">
+              We build with constraint. Tight teams, real revenue, no burn-for-burn's-sake.
+            </p>
+          </div>
+
+          <div class="principle reveal" data-delay="2" data-cursor="hover">
+            <div class="principle-num">03<span class="dot">.</span></div>
+            <h3 class="principle-heading">Long horizons.</h3>
+            <p class="principle-body">
+              We invest in companies whose value compounds. Time is the strategy, not the obstacle.
+            </p>
+          </div>
+
         </div>
       </div>
-    </div>
-  </section>
+    </section>
 
+  </main>
+
+  <!-- ───── Footer ───── -->
   <footer class="site-footer">
     <div class="container">
+      <div class="footer-mark" aria-hidden="true">
+        Vala<span class="ital">high</span>
+      </div>
       <div class="footer-grid">
         <div class="footer-col">
           <strong>Valahigh Co LLC</strong>
-          <span>Houston, Texas</span>
+          Houston, Texas
         </div>
         <div class="footer-col">
-          <a href="mailto:hello@valahigh.us">hello@valahigh.us</a>
-          <a href="https://linkedin.com/in/afayemi/" target="_blank" rel="noopener">Founder</a>
+          <a class="footer-link" href="mailto:hello@valahigh.us" data-cursor="hover">hello@valahigh.us</a><br />
+          <a class="footer-link" href="https://linkedin.com/in/afayemi/" target="_blank" rel="noopener noreferrer" data-cursor="hover">Founder</a>
         </div>
-        <div class="footer-col copyright">
-          © 2026 Valahigh Co LLC.<br/>
-          All rights reserved.
+        <div class="footer-col right">
+          © MMXXVI Valahigh Co LLC<br />
+          All rights reserved
         </div>
       </div>
     </div>
   </footer>
+
+  <script>
+  (function () {
+    /* ───── Custom cursor ───── */
+    const cursor = document.querySelector('.cursor');
+    let cx = window.innerWidth / 2, cy = window.innerHeight / 2;
+    let tx = cx, ty = cy;
+
+    window.addEventListener('mousemove', (e) => {
+      tx = e.clientX; ty = e.clientY;
+    }, { passive: true });
+
+    function tick() {
+      cx += (tx - cx) * 0.22;
+      cy += (ty - cy) * 0.22;
+      if (cursor) cursor.style.transform = `translate(${cx}px, ${cy}px) translate(-50%, -50%)`;
+      requestAnimationFrame(tick);
+    }
+    tick();
+
+    document.querySelectorAll('[data-cursor]').forEach(el => {
+      const mode = el.getAttribute('data-cursor');
+      el.addEventListener('mouseenter', () => cursor && cursor.classList.add(mode));
+      el.addEventListener('mouseleave', () => cursor && cursor.classList.remove(mode));
+    });
+
+    /* ───── Header on scroll ───── */
+    const header = document.querySelector('.site-header');
+    const onScroll = () => {
+      if (window.scrollY > 40) header.classList.add('scrolled');
+      else header.classList.remove('scrolled');
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+
+    /* ───── Hero cursor-reactive type field ───── */
+    const field = document.getElementById('field');
+    if (field) {
+      const letters = ['V', 'a', 'l', 'a', 'h', 'i', 'g', 'h', '·', 'V', 'h'];
+      const rect = () => field.getBoundingClientRect();
+      const items = [];
+      const count = 18;
+      for (let i = 0; i < count; i++) {
+        const span = document.createElement('span');
+        span.className = 'field-letter';
+        span.textContent = letters[i % letters.length];
+        const size = 80 + Math.random() * 240;
+        span.style.fontSize = size + 'px';
+        span.style.left = (Math.random() * 100) + '%';
+        span.style.top = (Math.random() * 100) + '%';
+        if (Math.random() < 0.18) {
+          span.style.fontStyle = 'italic';
+          span.style.color = '#6B1E3F';
+          span.style.opacity = '0.07';
+        }
+        field.appendChild(span);
+        items.push({ el: span, ox: 0, oy: 0, depth: 0.3 + Math.random() * 1.6 });
+      }
+      let mx = 0, my = 0;
+      window.addEventListener('mousemove', (e) => {
+        const r = rect();
+        mx = (e.clientX - r.left - r.width / 2) / r.width;
+        my = (e.clientY - r.top - r.height / 2) / r.height;
+        items.forEach(it => {
+          const tx = -mx * 60 * it.depth;
+          const ty = -my * 40 * it.depth;
+          it.el.style.transform = `translate3d(${tx}px, ${ty}px, 0)`;
+        });
+      }, { passive: true });
+    }
+
+    /* ───── Reveal on scroll ───── */
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          e.target.classList.add('in');
+          if (e.target.classList.contains('section-label')) e.target.classList.add('in-view');
+        }
+      });
+    }, { threshold: 0.18, rootMargin: '0px 0px -10% 0px' });
+    document.querySelectorAll('.reveal, .section-label').forEach(el => io.observe(el));
+
+    /* ───── Manifesto: word-by-word lit on scroll ───── */
+    const manifesto = document.getElementById('manifesto');
+    if (manifesto) {
+      const words = manifesto.querySelectorAll('.word');
+      const onMani = () => {
+        const r = manifesto.getBoundingClientRect();
+        const vh = window.innerHeight;
+        const start = vh * 0.85;
+        const end = vh * 0.25;
+        const progress = Math.max(0, Math.min(1, (start - r.top) / (start - end)));
+        const lit = Math.floor(progress * words.length);
+        words.forEach((w, i) => w.classList.toggle('lit', i < lit));
+      };
+      window.addEventListener('scroll', onMani, { passive: true });
+      onMani();
+    }
+
+    /* ───── Card radial-glow follows pointer ───── */
+    document.querySelectorAll('.card').forEach(card => {
+      card.addEventListener('mousemove', (e) => {
+        const r = card.getBoundingClientRect();
+        card.style.setProperty('--mx', ((e.clientX - r.left) / r.width * 100) + '%');
+        card.style.setProperty('--my', ((e.clientY - r.top) / r.height * 100) + '%');
+      });
+    });
+  })();
+  </script>
+
 </body>
 </html>

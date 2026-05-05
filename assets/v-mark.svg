@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Valahigh V mark">
+  
+  <defs>
+    <clipPath id="vc">
+      <path d="M40 36&#xA;               L52 36&#xA;               L60 36&#xA;               L100 152&#xA;               L140 36&#xA;               L148 36&#xA;               L160 36&#xA;               L160 44&#xA;               L150 44&#xA;               L108 168&#xA;               L100 178&#xA;               L92 168&#xA;               L50 44&#xA;               L40 44&#xA;               Z"></path>
+    </clipPath>
+  </defs>
+  <rect width="200" height="200" fill="none"></rect>
+  
+  <path d="M44 38&#xA;           L66 38&#xA;           L100 138&#xA;           L134 38&#xA;           L156 38&#xA;           L156 44&#xA;           L148 44&#xA;           L106 168&#xA;           L100 178&#xA;           L94 168&#xA;           L52 44&#xA;           L44 44&#xA;           Z" fill="#0F172A"></path>
+  
+  <line x1="100" y1="40" x2="100" y2="166" stroke="#0F172A" stroke-width="0.6" opacity="0.18"></line>
+</svg>
