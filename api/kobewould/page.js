@@ -143,6 +143,7 @@ const GLOSS_JSON = JSON.stringify(GLOSSARY).replace(/`/g, "\\`").replace(/\$\{/g
 
 const APP = SHELL(`<div class="wrap">
   <div id="banners"></div>
+  <div id="controls" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;"></div>
   <!-- MASTHEAD -->
   <div style="display:flex;align-items:flex-end;justify-content:space-between;padding-bottom:14px;gap:20px;flex-wrap:wrap;">
     <div style="display:flex;align-items:flex-end;gap:22px;">
@@ -602,8 +603,34 @@ async function refresh(){
   if(killed) banners+='<div class="banner" style="background:#9c3a2b;color:#f4ecdd;"><span class="dot" style="background:#f4ecdd;animation:kobepulse 1s steps(1) infinite;"></span><b style="letter-spacing:1.5px;">'+(SNAP.kill_switch?"KILL ENGAGED":"HALTED")+'</b><span style="font-size:11.5px;color:#f0d9cf;">'+esc(SNAP.halt_reason||"all new entries blocked · exits managed · clear locally")+'</span></div>';
   if(age>30) banners+='<div class="banner" style="background:rgba(176,125,42,0.12);color:'+C.honey+';border:1px solid rgba(176,125,42,0.4);">⚠ snapshot '+fmt(age,0)+' min old — keel or its publisher may be down</div>';
   $("banners").innerHTML=banners;
+  renderControls(killed);
   renderStatline();
   render();
+}
+
+function cmdBtn(action,label,bg){
+  return '<button class="cmd" data-a="'+action+'" style="background:'+bg+';color:var(--paper);border:0;border-radius:3px;padding:7px 14px;font-family:Geist Mono,monospace;font-size:11.5px;letter-spacing:.5px;cursor:pointer;">'+label+'</button>';
+}
+function renderControls(killed){
+  const passReason = SNAP && SNAP.pass_reason;
+  let html='<span class="eyebrow" style="margin-right:4px;">Controls</span>';
+  if(killed){ html+=cmdBtn("resume","▶ RESUME TRADING",C.sage); }
+  else {
+    html+=cmdBtn("halt","⛔ HALT (kill switch)",C.brick);
+    html+= passReason ? cmdBtn("unpass","↺ CANCEL PASS DAY",C.honey) : cmdBtn("pass","⏸ PASS TODAY",C.honey);
+  }
+  html+='<span id="cmdmsg" class="mono" style="font-size:10.5px;color:var(--slate);margin-left:4px;"></span>';
+  $("controls").innerHTML=html;
+  document.querySelectorAll(".cmd").forEach(b=>b.onclick=async()=>{
+    const a=b.dataset.a;
+    if((a==="halt"||a==="resume") && !confirm(a==="halt"?"Halt all trading? Blocks new entries until you resume.":"Resume trading?")) return;
+    document.querySelectorAll(".cmd").forEach(x=>x.disabled=true);
+    $("cmdmsg").textContent="sending…";
+    try{ const r=await fetch("/api/kobewould/command",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:a})}); const j=await r.json();
+      $("cmdmsg").textContent=j.ok?("queued “"+j.queued+"” — applies within ~1 min on your machine"):("error: "+(j.error||r.status)); }
+    catch(e){ $("cmdmsg").textContent="error: "+e.message; }
+    finally{ document.querySelectorAll(".cmd").forEach(x=>x.disabled=false); }
+  });
 }
 clock(); setInterval(clock,1000);
 refresh(); setInterval(refresh,60000);
