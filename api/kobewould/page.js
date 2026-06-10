@@ -170,8 +170,9 @@ const esc = s => String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").repl
 const C = { navy:"#14263f", wine:"#8a2742", sage:"#5f7a4d", honey:"#b07d2a",
             brick:"#9c3a2b", assist:"#1f3a5f", mute:"#9a8f7a", slate:"#7a8694" };
 let SNAP=null, view=location.hash.slice(1)||"mission", reportTab="brief";
-const VIEWS=[["mission","Mission"],["theses","Theses"],["m7a","M7A"],["smb","SMB"],
+const VIEWS=[["mission","Mission"],["decon","Deconstruct"],["theses","Theses"],["m7a","M7A"],["smb","SMB"],
              ["opps","Opportunities"],["reads","Reads"],["reports","Reports"]];
+let deconSlug=null;
 const cls = v => v>=0 ? "green" : "red";
 
 function md(src){
@@ -351,6 +352,21 @@ function renderScanPage(key,title,blurb){
     scanTable(scan[key])+'<div style="margin-top:24px;"><div class="sect-h" style="margin-bottom:10px;">Narrative · weekly research</div>'+md(pages[key+"_md"])+'</div>';
 }
 
+function renderDecon(){
+  const list=SNAP.deconstructions||[];
+  if(!list.length) return '<div class="sect-h" style="margin-bottom:6px;">Thesis deconstruction</div>'+
+    '<div class="dim">No deconstructions yet. Ask Claude: "deconstruct &lt;company or theme&gt;" '+
+    '(e.g. SpaceX, the AI-power buildout, GLP-1 drugs). It breaks the business into segments, '+
+    'maps public suppliers/customers/competitors, pulls each ticker\\'s regime &amp; relative-strength read, '+
+    'and frames long/short/ETF exposure — as a learning tool, not advice.</div>';
+  if(!deconSlug || !list.find(d=>d.slug===deconSlug)) deconSlug=list[0].slug;
+  const sel=list.find(d=>d.slug===deconSlug);
+  let picker='<div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:16px;">';
+  list.forEach(d=>{ picker+='<button data-slug="'+esc(d.slug)+'" class="deconpick" style="background:'+(d.slug===deconSlug?'var(--navy)':'transparent')+';color:'+(d.slug===deconSlug?'var(--paper)':'var(--slate)')+';border:1px solid var(--line);border-radius:3px;padding:5px 12px;cursor:pointer;font-family:Geist Mono,monospace;font-size:11.5px;">'+esc(d.title)+'</button>'; });
+  picker+='</div>';
+  return '<div class="sect-h" style="margin-bottom:12px;">Thesis deconstruction · learning tool, not advice</div>'+picker+md(sel.md);
+}
+
 function renderReports(){
   const r=SNAP.reports||{}, map={brief:r.brief_md,recap:r.recap_md,review:r.review_md};
   const tab=(id,k,lbl)=>'<button id="'+id+'" class="'+(reportTab===k?"on":"")+'" style="background:transparent;border:none;border-bottom:2px solid '+(reportTab===k?"var(--wine)":"transparent")+';color:'+(reportTab===k?"var(--navy)":"var(--slate)")+';font:inherit;font-weight:600;cursor:pointer;margin-right:14px;padding:4px 2px;">'+lbl+'</button>';
@@ -363,6 +379,7 @@ function render(){
   document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{view=b.dataset.v;location.hash=view;render();});
   let html="";
   if(view==="mission") html=renderMission();
+  else if(view==="decon") html=renderDecon();
   else if(view==="theses") html=renderTheses();
   else if(view==="m7a") html=renderScanPage("m7a","M7A · megacap / AI complex","Daily-bar read from Keel's own regime engine: who trends, who's extended, who leads.");
   else if(view==="smb") html=renderScanPage("smb","SMB · small &amp; mid-cap complex","IWM / MDY / equal-weight breadth — is risk appetite broadening beyond megacaps?");
@@ -371,6 +388,7 @@ function render(){
   else if(view==="reports") html=renderReports();
   $("view").innerHTML=html;
   if(view==="reports"){ $("tb").onclick=()=>{reportTab="brief";render();}; $("trc").onclick=()=>{reportTab="recap";render();}; $("tv").onclick=()=>{reportTab="review";render();}; }
+  if(view==="decon"){ document.querySelectorAll(".deconpick").forEach(b=>b.onclick=()=>{deconSlug=b.dataset.slug;render();}); }
 }
 
 function clock(){
