@@ -3,7 +3,7 @@
 // "provenance bands" marking the surfaces an LLM touched (Posture, Decision
 // Journal) while the deterministic money path stays warm paper.
 // READ-ONLY by construction (ADR-018): kill/mode are indicators, not buttons.
-import { configured, isAuthed, sendHtml, env } from "./_lib.js";
+import { configured, env, isAuthed, readCred, sendHtml, setupEnabled } from "./_lib.js";
 
 const FONTS = `<link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -81,6 +81,29 @@ const SHELL = (inner) => `<!doctype html>
   .center{ display:flex; min-height:78vh; align-items:center; justify-content:center; }
   .banner{ border-radius:3px; padding:11px 18px; display:flex; align-items:center; gap:13px;
     margin-bottom:16px; font-family:'Geist Mono',monospace; }
+  .grid3{ display:grid; grid-template-columns:1.05fr 1.1fr 0.95fr; gap:0; }
+  .grid3 > .col{ padding:4px 26px 0; border-left:1px solid var(--line); }
+  .grid3 > .col:first-child{ padding-left:0; border-left:none; }
+  .setup-field{ display:block; margin:12px 0; }
+  .setup-field label{ display:block; font-size:11px; color:var(--slate); margin-bottom:5px;
+    text-transform:uppercase; letter-spacing:.8px; }
+  /* ── mobile ── */
+  @media (max-width:760px){
+    .wrap{ padding:14px 14px 40px; }
+    h1{ font-size:36px; }
+    #statline{ grid-template-columns:1fr 1fr !important; }
+    #statline > div{ padding:12px 10px !important; border-left:none !important;
+      border-top:1px solid var(--hair); }
+    #statline > div:first-child{ border-top:none; }
+    .grid3{ grid-template-columns:1fr !important; }
+    .grid3 > .col{ padding:18px 0 0 !important; border-left:none !important;
+      border-top:1px solid var(--line); margin-top:4px; }
+    .grid3 > .col:first-child{ border-top:none; margin-top:0; }
+    nav{ gap:2px; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    nav button{ font-size:11px; margin-right:8px; white-space:nowrap; }
+    table{ font-size:11.5px; } td,th{ padding:6px 5px; }
+    input[type=password]{ width:100%; }
+  }
 </style></head><body>${inner}</body></html>`;
 
 const LOGIN = SHELL(`<div class="wrap"><div class="center"><form method="POST" action="/api/kobewould/login">
@@ -90,10 +113,20 @@ const LOGIN = SHELL(`<div class="wrap"><div class="center"><form method="POST" a
   <button class="go" type="submit">ENTER</button>
 </form></div></div>`);
 
-const SETUP = SHELL(`<div class="wrap"><div class="center"><div>
+const SETUP_INFRA = SHELL(`<div class="wrap"><div class="center"><div>
   <div style="font-family:'Big Shoulders Display',sans-serif;font-weight:800;font-size:46px;">KOBE</div>
-  <p class="dim">Setup pending — set KOBEWOULD_PASSWORD, KOBEWOULD_SECRET, KEEL_PUBLISH_TOKEN on the Vercel project, connect a Blob store, redeploy.</p>
+  <p class="dim">Setup pending — set KOBEWOULD_SECRET and KEEL_PUBLISH_TOKEN on the Vercel project, redeploy.</p>
 </div></div></div>`);
+
+const SETUP = SHELL(`<div class="wrap"><div class="center"><form method="POST" action="/api/kobewould/setup" style="width:300px;max-width:100%;">
+  <div style="font-family:'Big Shoulders Display',sans-serif;font-weight:800;font-size:46px;letter-spacing:.5px;color:var(--navy);">KOBE</div>
+  <div class="mono" style="font-size:10.5px;color:var(--slate);margin-bottom:16px;border-left:2px solid var(--wine);padding-left:11px;">first-run setup · choose your password</div>
+  <div class="setup-field"><label>setup code</label><input type="password" name="code" required autocomplete="off" placeholder="from kobewould-secrets.local.txt"></div>
+  <div class="setup-field"><label>new password (min 8)</label><input type="password" name="password" minlength="8" required autocomplete="new-password"></div>
+  <div class="setup-field"><label>confirm password</label><input type="password" name="confirm" minlength="8" required autocomplete="new-password"></div>
+  <button class="go" type="submit" style="margin:6px 0 0;width:100%;">SET PASSWORD</button>
+  <div class="mono" style="font-size:10px;color:var(--slate);margin-top:14px;line-height:1.6;">The setup code is one-time. After this you log in with just your password. Forgot it later? Visit /kobewould?setup=1 and re-enter the code.</div>
+</form></div></div>`);
 
 const APP = SHELL(`<div class="wrap">
   <div id="banners"></div>
@@ -281,10 +314,10 @@ function decisionJournal(){
 }
 
 function renderMission(){
-  return '<div style="display:grid;grid-template-columns:1.05fr 1.1fr 0.95fr;gap:0;">'+
-    '<div style="padding:4px 26px 0 0;">'+ladder()+'</div>'+
-    '<div style="padding:4px 26px 0;border-left:1px solid var(--line);">'+regimeBoard()+positionsPanel()+'</div>'+
-    '<div style="padding:4px 0 0 26px;border-left:1px solid var(--line);">'+provenancePosture()+decisionJournal()+'</div>'+
+  return '<div class="grid3">'+
+    '<div class="col">'+ladder()+'</div>'+
+    '<div class="col">'+regimeBoard()+positionsPanel()+'</div>'+
+    '<div class="col">'+provenancePosture()+decisionJournal()+'</div>'+
     '</div>';
 }
 
@@ -379,7 +412,12 @@ refresh(); setInterval(refresh,60000);
 </div>`);
 
 export default async function handler(req, res) {
-  if (!configured()) return sendHtml(res, 200, SETUP);
+  if (!configured()) return sendHtml(res, 200, SETUP_INFRA);
   if (isAuthed(req, env("KOBEWOULD_SECRET"))) return sendHtml(res, 200, APP);
+  const forceSetup = /[?&]setup=1/.test(req.url || "");
+  if (setupEnabled()) {
+    const cred = await readCred();
+    if (!cred || forceSetup) return sendHtml(res, 200, SETUP);
+  }
   return sendHtml(res, 200, LOGIN);
 }
