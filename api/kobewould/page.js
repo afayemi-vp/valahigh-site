@@ -169,6 +169,7 @@ const APP = SHELL(`<div class="wrap">
 
   <nav id="nav"></nav>
   <div id="view">loading…</div>
+  <div id="tkmodal" style="display:none;position:fixed;inset:0;background:rgba(20,38,63,0.4);z-index:50;align-items:flex-start;justify-content:center;padding:40px 14px;overflow:auto;"></div>
 
   <!-- FOOTER -->
   <div style="display:flex;align-items:center;justify-content:space-between;margin-top:30px;padding-top:14px;border-top:2px solid var(--navy);flex-wrap:wrap;gap:12px;">
@@ -185,6 +186,69 @@ const C = { navy:"#14263f", wine:"#8a2742", sage:"#5f7a4d", honey:"#b07d2a",
             brick:"#9c3a2b", assist:"#1f3a5f", mute:"#9a8f7a", slate:"#7a8694" };
 const GLOSSARY = ${GLOSS_JSON};
 let glossQ = "";
+const FORMULAS = [
+  ["adx", "DX = 100·|+DI − −DI| / (+DI + −DI); ADX = Wilder-smoothed DX over 14 bars. ≥22 = real trend, <20 = chop."],
+  ["atr", "TR = max(H−L, |H−Cprev|, |L−Cprev|); ATR = Wilder average of TR over 14. ATR% = ATR / price."],
+  ["ema", "EMAn = price·k + EMAn-1·(1−k), where k = 2/(n+1). EMA20 reacts ~2.5× faster than EMA50."],
+  ["extension", "ext = (close − EMA20) / ATR. +2 means price is 2 average-days above its mean."],
+  ["relative strength", "RS = (asset 3-month return) − (benchmark 3-month return), in %. Positive = beating the market."],
+  ["rsi", "RSI = 100 − 100/(1 + avg_gain/avg_loss). RSI(2) uses a 2-period lookback, so it whipsaws to extremes fast."],
+  ["donchian", "Upper = highest high of prior N bars (excl. current); Lower = lowest low. Breakout = close > Upper."],
+  ["bollinger", "mid = SMA20, bands = mid ± 2·stdev; bandwidth = (upper − lower)/mid. Squeeze = bandwidth in low percentile of last 240 bars."],
+  ["risk per trade", "risk budget = equity × risk% (0.75% default); hard ceiling = equity × 1%."],
+  ["position sizing", "qty = (equity × risk%) / |entry − stop|, rounded down to lot size."],
+  ["hard stop", "long stop = entry − k·ATR; max loss = (entry − stop) × qty, capped at 1% of equity."],
+  ["trailing", "chandelier stop = max(previous stop, highest_close_since_entry − 3·ATR). Ratchets up only."],
+  ["chandelier", "stop = highest_close_since_entry − 3·ATR, raised never lowered."],
+  ["notional", "position value (qty × price) ≤ 40% of equity (30% for crypto)."],
+  ["correlation", "Σ same-direction risk within a bucket ≤ the bucket cap; SPY+QQQ+BTC share the risk-on bucket."],
+  ["drawdown", "drawdown% = (high-water mark − equity) / high-water mark × 100."],
+  ["loss cap", "halt new entries when day P&L ≤ −3% of equity (week ≤ −6%)."],
+  ["cooldown", "after 2 losses on an instrument, block it for N bars of its timeframe."],
+  ["quality score", "quality = 0.40·signal_conf + 0.25·regime_conf + 0.20·perf + 0.15·cost; enter only if ≥ 0.55."],
+  ["r-multiple", "R = realized P&L / planned risk. +2R = made twice what you risked; losses pin near −1R."],
+  ["expectancy", "expectancy (R) = win% × avg_win − loss% × avg_loss. Positive = edge."],
+  ["profit factor", "PF = gross profit / gross loss. >1 profitable; >1.5 good."],
+  ["win rate", "win rate = winning trades / total trades. High win rate ≠ profitable without R."],
+  ["cost guard", "edge multiple = expected move / (2 × round-trip cost); trade refused if < 2."],
+  ["posture", "risk_factor ∈ [0.25, 1.0] (reduce-only); effective risk = budget × risk_factor."],
+];
+function formulaFor(term){ const t=(term||"").toLowerCase(); for(const [k,f] of FORMULAS){ if(t.includes(k)) return f; } return null; }
+
+function tickerIndex(){
+  const idx={};
+  const add=(r)=>{ if(r && r.ticker && !r.error && !idx[r.ticker]) idx[r.ticker]=r; };
+  const ts=SNAP.trend_scan||{}; (ts.m7a||[]).forEach(add); (ts.smb||[]).forEach(add);
+  const m=SNAP.markets||{}; Object.values(m.groups||{}).forEach(g=>g.forEach(add)); (m.strongest||[]).forEach(add);
+  return idx;
+}
+function tk(ticker){ return '<span class="tk" data-t="'+esc(ticker)+'" style="cursor:pointer;border-bottom:1px dotted var(--wine);">'+esc(ticker)+'</span>'; }
+function closeTk(){ $("tkmodal").style.display="none"; }
+function showTk(ticker){
+  const r=tickerIndex()[ticker];
+  const m=$("tkmodal");
+  if(!r){ m.innerHTML='<div style="background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:18px;max-width:340px;width:100%;"><b>'+esc(ticker)+'</b><div class="dim" style="margin:8px 0;">No tape data in this snapshot. Queue a deconstruction to research it.</div><button class="go" id="tkreq2">Request deconstruction</button> <button id="tkx2" style="margin-left:6px;background:transparent;border:1px solid var(--line);border-radius:3px;padding:8px 12px;cursor:pointer;">close</button></div>'; }
+  else {
+    const row=(lbl,val,cls)=>'<div style="display:flex;justify-content:space-between;padding:5px 0;border-top:1px solid var(--hair);"><span class="dim">'+lbl+'</span><span class="mono '+(cls||"")+'">'+val+'</span></div>';
+    m.innerHTML='<div style="background:var(--paper);border:1px solid var(--navy);border-radius:4px;padding:18px;max-width:380px;width:100%;box-shadow:0 8px 30px rgba(20,38,63,0.25);">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-family:Big Shoulders Display,sans-serif;font-weight:800;font-size:26px;">'+esc(ticker)+'</div><button id="tkx" style="background:transparent;border:1px solid var(--line);border-radius:3px;padding:5px 10px;cursor:pointer;">✕</button></div>'+
+      '<div class="dim" style="margin-bottom:8px;">'+esc(r.name||"")+'</div>'+
+      '<div style="margin:8px 0;">'+spark(r.spark,340,54)+'</div>'+
+      row("regime", esc(r.regime))+row("regime conf", fmt(r.regime_conf,2))+
+      row("ADX (trend strength)", fmt(r.adx,1)+(r.adx>=22?" — real trend":" — chop"))+
+      row("extension (ATR from EMA20)", fmt(r.ext_atr,2))+
+      row("above EMA50", r.above_ema50?"Y — above water":"N — below water", r.above_ema50?"green":"red")+
+      row("3-month return", fmt(r.ret_3m_pct,1)+"%", cls(r.ret_3m_pct))+
+      row("relative strength vs SPY", fmt(r.rs_3m_pct,1)+"%", cls(r.rs_3m_pct))+
+      '<div style="margin-top:12px;display:flex;gap:8px;"><button class="go" id="tkreq" data-t="'+esc(ticker)+'">Request deconstruction</button><button id="tkx3" style="background:transparent;border:1px solid var(--line);border-radius:3px;padding:8px 14px;cursor:pointer;">close</button></div></div>';
+  }
+  m.style.display="flex";
+  m.onclick=(e)=>{ if(e.target===m) closeTk(); };
+  ["tkx","tkx2","tkx3"].forEach(id=>{ const b=document.getElementById(id); if(b) b.onclick=closeTk; });
+  ["tkreq","tkreq2"].forEach(id=>{ const b=document.getElementById(id); if(b) b.onclick=async()=>{ b.disabled=true; b.textContent="queuing…";
+    try{ await fetch("/api/kobewould/request",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({subject:ticker})}); b.textContent="queued ✓ (fulfilled on next daily run)"; }
+    catch(e){ b.textContent="error"; } }; });
+}
 
 function spark(values, w, h){
   if(!values || values.length < 2) return "";
@@ -378,7 +442,7 @@ function scanTable(rows){
   if(!rows||!rows.length) return '<div class="dim">no scan yet — runs with the 07:00 brief or keel scan.</div>';
   return '<table><tr><th>ticker</th><th>chart (60d)</th><th>regime</th><th>ADX</th><th>ext</th><th>&gt;EMA50</th><th style="text-align:right;">3m %</th><th style="text-align:right;">RS vs bench</th></tr>'+
     rows.map(r=>r.error?'<tr><td style="font-weight:600;">'+esc(r.ticker)+'</td><td colspan="7" class="dim">'+esc(r.error)+'</td></tr>'
-      :'<tr><td style="font-weight:600;">'+esc(r.ticker)+'</td><td>'+spark(r.spark)+'</td><td>'+esc(r.regime)+'</td><td>'+fmt(r.adx,1)+'</td><td>'+fmt(r.ext_atr,2)+'</td><td>'+(r.above_ema50?"Y":"N")+
+      :'<tr><td style="font-weight:600;">'+tk(r.ticker)+'</td><td>'+spark(r.spark)+'</td><td>'+esc(r.regime)+'</td><td>'+fmt(r.adx,1)+'</td><td>'+fmt(r.ext_atr,2)+'</td><td>'+(r.above_ema50?"Y":"N")+
       '</td><td style="text-align:right;" class="'+cls(r.ret_3m_pct)+'">'+fmt(r.ret_3m_pct,1)+'</td><td style="text-align:right;" class="'+cls(r.rs_3m_pct)+'">'+fmt(r.rs_3m_pct,1)+'</td></tr>'
     ).join("")+'</table>';
 }
@@ -421,10 +485,12 @@ function renderGlossary(){
     if(!items.length) return;
     html+='<div class="sect-h" style="margin:18px 0 4px;color:var(--wine);">'+esc(g)+'</div>';
     items.forEach(e=>{
+      const fm=formulaFor(e.term);
       html+='<div style="padding:11px 0;border-top:1px solid var(--hair);">'+
         '<div style="font-weight:600;font-size:13.5px;margin-bottom:4px;">'+esc(e.term)+'</div>'+
         '<div style="font-size:13px;line-height:1.55;">'+esc(e.what)+'</div>'+
         '<div style="font-size:12.5px;line-height:1.55;color:var(--slate);margin-top:3px;"><b style="color:var(--honey);">Why it matters:</b> '+esc(e.why)+'</div>'+
+        (fm?'<div class="mono" style="font-size:11.5px;line-height:1.6;margin-top:4px;background:rgba(20,38,63,0.05);border-left:2px solid var(--wine);padding:5px 9px;"><b style="color:var(--wine);">Formula:</b> '+esc(fm)+'</div>':'')+
         '<div class="mono" style="font-size:11.5px;line-height:1.55;color:var(--slate);margin-top:3px;"><b style="color:var(--assist);">Example:</b> '+esc(e.example)+'</div></div>';
     });
   });
@@ -453,7 +519,7 @@ function rsBar(rs){
 function marketRows(rows){
   if(!rows||!rows.length) return '<tr><td colspan="7" class="dim">no data</td></tr>';
   return rows.filter(r=>!r.error).map(r=>
-    '<tr><td style="font-weight:600;">'+esc(r.ticker)+'</td><td class="dim" style="color:var(--slate);">'+esc(r.name||"")+
+    '<tr><td style="font-weight:600;">'+tk(r.ticker)+'</td><td class="dim" style="color:var(--slate);">'+esc(r.name||"")+
     '</td><td>'+spark(r.spark)+'</td><td>'+esc(r.regime)+
     '</td><td class="'+cls(r.ret_3m_pct)+'">'+fmt(r.ret_3m_pct,1)+'</td>'+
     '<td>'+rsBar(r.rs_3m_pct)+' <span class="'+cls(r.rs_3m_pct)+'" style="font-size:11px;">'+fmt(r.rs_3m_pct,1)+'</span></td></tr>'
@@ -470,8 +536,16 @@ function renderMarkets(){
   pick+='</div>';
   const rows = marketGroup==="strongest" ? m.strongest : (m.groups[marketGroup]||[]);
   const gen=m.generated_at?' · '+m.generated_at.slice(0,10)+' · vs '+esc(m.benchmark):'';
+  // dynamic "how to read" insight from the live leaders/laggards
+  const all=(m.strongest||[]).filter(r=>r.rs_3m_pct!=null);
+  const lead=all[0], lag=all[all.length-1];
+  let insight='';
+  if(lead&&lag){ insight='<div class="band"><div class="t" style="padding:0;">How to read strength</div></div><div class="band-body" style="font-size:12.5px;line-height:1.6;">'+
+    '<p><b>Relative strength (RS)</b> is the one number that matters here — it\\'s how much a market has out- or under-performed the world over 3 months. <b style="color:var(--sage);">Positive = money is flowing IN</b>; negative = flowing out. You ride leaders, you don\\'t bottom-fish laggards.</p>'+
+    '<p>Right now <b>'+esc(lead.ticker)+' ('+esc(lead.name||"")+')</b> leads at <b class="green">'+fmt(lead.rs_3m_pct,1)+'</b> and <b>'+esc(lag.ticker)+' ('+esc(lag.name||"")+')</b> lags at <b class="red">'+fmt(lag.rs_3m_pct,1)+'</b>. A leader worth acting on also shows <b>&gt;EMA50 = Y</b> (above water) and <b>ADX ≥ 22</b> (a real trend, not noise). A high RS with N below EMA50 is a fading move; tap any ticker for its full read.</p>'+
+    '<p class="dim">Playbook: leaders in a confirmed trend = momentum/trend longs on pullbacks; laggards reclaiming EMA50 with RS turning up = early rotation. Stretched (big +ext) = wait for a pullback, don\\'t chase.</p></div>'; }
   return '<div class="sect-h" style="margin-bottom:6px;">Global markets · trend &amp; relative strength'+gen+'</div>'+
-    '<div class="sect-meta" style="margin-bottom:12px;">Where capital is flowing across economies and asset classes. RS = 3-month performance vs the world benchmark.</div>'+pick+
+    '<div class="sect-meta" style="margin-bottom:12px;">Where capital is flowing across economies and asset classes. RS = 3-month performance vs the world benchmark. Tap any ticker for its read.</div>'+insight+'<div style="height:14px;"></div>'+pick+
     '<table><tr><th>ticker</th><th>market</th><th>chart (60d)</th><th>regime</th><th style="text-align:left;">3m %</th><th>relative strength</th></tr>'+marketRows(rows)+'</table>';
 }
 
@@ -632,6 +706,8 @@ function renderControls(killed){
     finally{ document.querySelectorAll(".cmd").forEach(x=>x.disabled=false); }
   });
 }
+document.addEventListener("click",(e)=>{ const t=e.target.closest&&e.target.closest(".tk"); if(t&&SNAP){ e.preventDefault(); showTk(t.dataset.t); } });
+document.addEventListener("keydown",(e)=>{ if(e.key==="Escape") closeTk(); });
 clock(); setInterval(clock,1000);
 refresh(); setInterval(refresh,60000);
 </script>
