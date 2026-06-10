@@ -75,8 +75,11 @@ export function verifyCred(password, cred) {
 export function blobAvailable() {
   return Boolean(env("BLOB_READ_WRITE_TOKEN"));
 }
-export function blobPrefix(publishToken) {
-  const h = crypto.createHash("sha256").update(publishToken).digest("hex");
+export function publishToken() {
+  return env("KEEL_PUBLISH_TOKEN").trim(); // tolerate CLI trailing newline
+}
+export function blobPrefix(token) {
+  const h = crypto.createHash("sha256").update(String(token).trim()).digest("hex");
   return `kobewould-${h.slice(0, 32)}`;
 }
 const CRED_NAME = "auth-cred.json";

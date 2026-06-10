@@ -1,22 +1,22 @@
 // POST /api/kobewould/ingest — Keel pushes read-only snapshots here.
 // Auth: Authorization: Bearer <KEEL_PUBLISH_TOKEN>. Storage: Vercel Blob.
 import { put } from "@vercel/blob";
-import { blobPrefix, env, timingSafeEqualStr } from "./_lib.js";
+import { blobPrefix, env, publishToken, timingSafeEqualStr } from "./_lib.js";
 
-const MAX_BYTES = 400_000;
+const MAX_BYTES = 600_000;
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     res.status(405).json({ error: "method not allowed" });
     return;
   }
-  const token = env("KEEL_PUBLISH_TOKEN");
+  const token = publishToken();
   if (!token) {
     res.status(503).json({ error: "publish token not configured" });
     return;
   }
   const auth = req.headers.authorization || "";
-  if (!auth.startsWith("Bearer ") || !timingSafeEqualStr(auth.slice(7), token)) {
+  if (!auth.startsWith("Bearer ") || !timingSafeEqualStr(auth.slice(7).trim(), token)) {
     res.status(401).json({ error: "unauthorized" });
     return;
   }
