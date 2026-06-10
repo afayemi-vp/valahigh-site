@@ -73,7 +73,8 @@ export function verifyCred(password, cred) {
 
 // ── blob storage (auth cred + snapshot) ──────────────────────────────────
 export function blobAvailable() {
-  return Boolean(env("BLOB_READ_WRITE_TOKEN"));
+  // classic token model OR the newer connected-store binding (v2 SDK)
+  return Boolean(env("BLOB_READ_WRITE_TOKEN") || env("BLOB_STORE_ID"));
 }
 export function publishToken() {
   return env("KEEL_PUBLISH_TOKEN").trim(); // tolerate CLI trailing newline
