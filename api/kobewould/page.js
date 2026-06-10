@@ -4,6 +4,7 @@
 // Journal) while the deterministic money path stays warm paper.
 // READ-ONLY by construction (ADR-018): kill/mode are indicators, not buttons.
 import { blobAvailable, configured, env, isAuthed, readCred, sendHtml, setupEnabled } from "./_lib.js";
+import { GLOSSARY } from "./_glossary.js";
 
 const FONTS = `<link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -138,6 +139,8 @@ const SETUP = SHELL(`<div class="wrap"><div class="center"><form method="POST" a
   <div class="mono" style="font-size:10px;color:var(--slate);margin-top:14px;line-height:1.6;">The setup code is one-time. After this you log in with just your password. Forgot it later? Visit /kobewould?setup=1 and re-enter the code.</div>
 </form></div></div>`);
 
+const GLOSS_JSON = JSON.stringify(GLOSSARY).replace(/`/g, "\\`").replace(/\$\{/g, "\\${");
+
 const APP = SHELL(`<div class="wrap">
   <div id="banners"></div>
   <!-- MASTHEAD -->
@@ -179,9 +182,20 @@ const fmt = (x, d=2) => (x==null||x===""||isNaN(x)) ? "—" : Number(x).toFixed(
 const esc = s => String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 const C = { navy:"#14263f", wine:"#8a2742", sage:"#5f7a4d", honey:"#b07d2a",
             brick:"#9c3a2b", assist:"#1f3a5f", mute:"#9a8f7a", slate:"#7a8694" };
+const GLOSSARY = ${GLOSS_JSON};
+let glossQ = "";
+
+function spark(values, w, h){
+  if(!values || values.length < 2) return "";
+  w = w || 84; h = h || 22;
+  const min = Math.min(...values), max = Math.max(...values), span = (max-min)||1;
+  const pts = values.map((v,i)=> (i/(values.length-1)*w).toFixed(1) + "," + (h-2-((v-min)/span*(h-4))).toFixed(1)).join(" ");
+  const up = values[values.length-1] >= values[0];
+  return '<svg width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" style="vertical-align:middle;"><polyline points="'+pts+'" fill="none" stroke="'+(up?C.sage:C.brick)+'" stroke-width="1.4"/></svg>';
+}
 let SNAP=null, view=location.hash.slice(1)||"mission", reportTab="brief";
 const VIEWS=[["mission","Mission"],["markets","Markets"],["rebalance","Rebalance"],["decon","Deconstruct"],["panels","Panels"],["theses","Theses"],["m7a","M7A"],["smb","SMB"],
-             ["opps","Opportunities"],["reads","Reads"],["reports","Reports"]];
+             ["opps","Opportunities"],["reads","Reads"],["reports","Reports"],["glossary","Glossary"]];
 let deconSlug=null, panelSlug=null, marketGroup="strongest", rebalAmount=null, layoutOpen=false;
 function loadLayout(){ try{ return JSON.parse(localStorage.getItem("kobe_layout")||"{}"); }catch(e){ return {}; } }
 function saveLayout(l){ try{ localStorage.setItem("kobe_layout", JSON.stringify(l)); }catch(e){} }
@@ -226,10 +240,14 @@ function renderStatline(){
   const b=SNAP.book||{}, r=SNAP.risk||{};
   const eq=b.equity, hwm=r.high_water_mark;
   const inceptionPct = (eq&&hwm) ? null : null;
+  const ven = SNAP.venues || {};
+  const kr = ven.kraken || null;
+  const krUsd = kr ? Object.entries(kr).map(([a,v])=>fmt(v)+" "+esc(a)).join(", ") : null;
   const first = '<div style="padding-right:22px;">'+
-    '<div class="eyebrow" style="margin-bottom:8px;">Equity</div>'+
+    '<div class="eyebrow" style="margin-bottom:8px;">Paper book</div>'+
     '<div class="mono" style="font-weight:600;font-size:30px;letter-spacing:-.5px;">$'+fmt(eq)+'</div>'+
-    '<div class="mono" style="font-size:10.5px;color:var(--slate);margin-top:4px;">cash $'+fmt(b.cash)+'</div></div>';
+    '<div class="mono" style="font-size:10.5px;color:var(--slate);margin-top:4px;">cash $'+fmt(b.cash)+
+    (krUsd ? ' · <span style="color:var(--wine);">Kraken (real): '+krUsd+'</span>' : '')+'</div></div>';
   const posture = SNAP.posture;
   const postureBig = posture ? ('risk ×'+fmt(posture.risk_factor,2)) : 'neutral';
   const postureSub = posture ? ((posture.stand_down&&posture.stand_down.length?('down: '+posture.stand_down.join(", ")):'')+(posture.note?(' · '+esc(posture.note)):'')) : 'no LLM reduction today';
@@ -357,9 +375,9 @@ function renderTheses(){
 
 function scanTable(rows){
   if(!rows||!rows.length) return '<div class="dim">no scan yet — runs with the 07:00 brief or keel scan.</div>';
-  return '<table><tr><th>ticker</th><th>regime</th><th>conf</th><th>ADX</th><th>ext</th><th>&gt;EMA50</th><th style="text-align:right;">3m %</th><th style="text-align:right;">RS vs bench</th></tr>'+
+  return '<table><tr><th>ticker</th><th>chart (60d)</th><th>regime</th><th>ADX</th><th>ext</th><th>&gt;EMA50</th><th style="text-align:right;">3m %</th><th style="text-align:right;">RS vs bench</th></tr>'+
     rows.map(r=>r.error?'<tr><td style="font-weight:600;">'+esc(r.ticker)+'</td><td colspan="7" class="dim">'+esc(r.error)+'</td></tr>'
-      :'<tr><td style="font-weight:600;">'+esc(r.ticker)+'</td><td>'+esc(r.regime)+'</td><td>'+fmt(r.regime_conf,2)+'</td><td>'+fmt(r.adx,1)+'</td><td>'+fmt(r.ext_atr,2)+'</td><td>'+(r.above_ema50?"Y":"N")+
+      :'<tr><td style="font-weight:600;">'+esc(r.ticker)+'</td><td>'+spark(r.spark)+'</td><td>'+esc(r.regime)+'</td><td>'+fmt(r.adx,1)+'</td><td>'+fmt(r.ext_atr,2)+'</td><td>'+(r.above_ema50?"Y":"N")+
       '</td><td style="text-align:right;" class="'+cls(r.ret_3m_pct)+'">'+fmt(r.ret_3m_pct,1)+'</td><td style="text-align:right;" class="'+cls(r.rs_3m_pct)+'">'+fmt(r.rs_3m_pct,1)+'</td></tr>'
     ).join("")+'</table>';
 }
@@ -391,6 +409,27 @@ function renderDecon(){
   return '<div class="sect-h" style="margin-bottom:12px;">Thesis deconstruction · learning tool, not advice</div>'+deconRequestBox()+picker+md(sel.md);
 }
 
+function renderGlossary(){
+  const groups=[];
+  GLOSSARY.forEach(e=>{ if(!groups.includes(e.group)) groups.push(e.group); });
+  const q=glossQ.toLowerCase();
+  let html='<div class="sect-h" style="margin-bottom:6px;">Glossary · every term on this site, in plain English</div>'+
+    '<input id="glossq" type="text" placeholder="search terms… (e.g. ADX, stop, R-multiple)" value="'+esc(glossQ)+'" style="width:100%;max-width:380px;background:#fff;border:1px solid var(--line);color:var(--navy);border-radius:3px;padding:9px 12px;font-family:Geist Mono,monospace;font-size:12px;margin-bottom:16px;">';
+  groups.forEach(g=>{
+    const items=GLOSSARY.filter(e=>e.group===g && (!q || (e.term+" "+e.what+" "+e.why).toLowerCase().includes(q)));
+    if(!items.length) return;
+    html+='<div class="sect-h" style="margin:18px 0 4px;color:var(--wine);">'+esc(g)+'</div>';
+    items.forEach(e=>{
+      html+='<div style="padding:11px 0;border-top:1px solid var(--hair);">'+
+        '<div style="font-weight:600;font-size:13.5px;margin-bottom:4px;">'+esc(e.term)+'</div>'+
+        '<div style="font-size:13px;line-height:1.55;">'+esc(e.what)+'</div>'+
+        '<div style="font-size:12.5px;line-height:1.55;color:var(--slate);margin-top:3px;"><b style="color:var(--honey);">Why it matters:</b> '+esc(e.why)+'</div>'+
+        '<div class="mono" style="font-size:11.5px;line-height:1.55;color:var(--slate);margin-top:3px;"><b style="color:var(--assist);">Example:</b> '+esc(e.example)+'</div></div>';
+    });
+  });
+  return html;
+}
+
 function renderPanels(){
   const list=SNAP.panels||[];
   if(!list.length) return '<div class="sect-h" style="margin-bottom:6px;">Research panels</div>'+
@@ -411,10 +450,10 @@ function rsBar(rs){
 }
 
 function marketRows(rows){
-  if(!rows||!rows.length) return '<tr><td colspan="6" class="dim">no data</td></tr>';
+  if(!rows||!rows.length) return '<tr><td colspan="7" class="dim">no data</td></tr>';
   return rows.filter(r=>!r.error).map(r=>
     '<tr><td style="font-weight:600;">'+esc(r.ticker)+'</td><td class="dim" style="color:var(--slate);">'+esc(r.name||"")+
-    '</td><td>'+esc(r.regime)+'</td><td>'+fmt(r.adx,0)+
+    '</td><td>'+spark(r.spark)+'</td><td>'+esc(r.regime)+
     '</td><td class="'+cls(r.ret_3m_pct)+'">'+fmt(r.ret_3m_pct,1)+'</td>'+
     '<td>'+rsBar(r.rs_3m_pct)+' <span class="'+cls(r.rs_3m_pct)+'" style="font-size:11px;">'+fmt(r.rs_3m_pct,1)+'</span></td></tr>'
   ).join("");
@@ -432,7 +471,7 @@ function renderMarkets(){
   const gen=m.generated_at?' · '+m.generated_at.slice(0,10)+' · vs '+esc(m.benchmark):'';
   return '<div class="sect-h" style="margin-bottom:6px;">Global markets · trend &amp; relative strength'+gen+'</div>'+
     '<div class="sect-meta" style="margin-bottom:12px;">Where capital is flowing across economies and asset classes. RS = 3-month performance vs the world benchmark.</div>'+pick+
-    '<table><tr><th>ticker</th><th>market</th><th>regime</th><th>ADX</th><th style="text-align:left;">3m %</th><th>relative strength</th></tr>'+marketRows(rows)+'</table>';
+    '<table><tr><th>ticker</th><th>market</th><th>chart (60d)</th><th>regime</th><th style="text-align:left;">3m %</th><th>relative strength</th></tr>'+marketRows(rows)+'</table>';
 }
 
 function renderRebalance(){
@@ -499,8 +538,9 @@ function render(){
   else if(view==="theses") html=renderTheses();
   else if(view==="m7a") html=renderScanPage("m7a","M7A · megacap / AI complex","Daily-bar read from Keel's own regime engine: who trends, who's extended, who leads.");
   else if(view==="smb") html=renderScanPage("smb","SMB · small &amp; mid-cap complex","IWM / MDY / equal-weight breadth — is risk appetite broadening beyond megacaps?");
-  else if(view==="opps") html='<div class="sect-h" style="margin-bottom:6px;">Opportunities · learning watchlist</div><div class="sect-meta" style="margin-bottom:14px;">Study material, not signals — Keel trades only its five configured instruments through the risk engine.</div>'+md((SNAP.pages||{}).opportunities_md);
+  else if(view==="opps") html='<div class="sect-h" style="margin-bottom:6px;">Opportunities · decision queue</div><div class="sect-meta" style="margin-bottom:14px;">Each entry is a decision-in-waiting: the setup, what QUALIFIES it (observable), and what INVALIDATES it. Overlaps with Kobe\\'s five instruments can be taken by the engine through the risk gates; the rest are exposure decisions you make at your broker with the same discipline.</div>'+md((SNAP.pages||{}).opportunities_md);
   else if(view==="reads") html='<div class="sect-h" style="margin-bottom:14px;">Reads</div>'+md((SNAP.pages||{}).reads_md);
+  else if(view==="glossary") html=renderGlossary();
   else if(view==="reports") html=renderReports();
   $("view").innerHTML=html;
   if(view==="reports"){ $("tb").onclick=()=>{reportTab="brief";render();}; $("trc").onclick=()=>{reportTab="recap";render();}; $("tv").onclick=()=>{reportTab="review";render();}; }
@@ -515,6 +555,7 @@ function render(){
   }
   if(view==="panels"){ document.querySelectorAll(".panelpick").forEach(b=>b.onclick=()=>{panelSlug=b.dataset.slug;render();}); }
   if(view==="markets"){ document.querySelectorAll(".mgpick").forEach(b=>b.onclick=()=>{marketGroup=b.dataset.mg;render();}); }
+  if(view==="glossary"){ const gq=$("glossq"); if(gq){ gq.oninput=()=>{ glossQ=gq.value; const pos=gq.selectionStart; render(); const n=$("glossq"); if(n){ n.focus(); try{n.setSelectionRange(pos,pos);}catch(e){} } }; } }
   if(view==="rebalance"){ const inp=$("rebamt"); if(inp) inp.oninput=()=>{ rebalAmount=Math.max(0,Number(inp.value)||0); const v=$("view"); const pos=inp.selectionStart; render(); const n=$("rebamt"); if(n){ n.focus(); try{n.setSelectionRange(pos,pos);}catch(e){} } }; }
   if(view==="layout"){
     const l=loadLayout(); l.hidden=l.hidden||[]; l.order=orderedViews().map(v=>v[0]).concat(VIEWS.map(v=>v[0]).filter(k=>!orderedViews().map(v=>v[0]).includes(k)));
