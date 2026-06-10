@@ -371,19 +371,24 @@ function renderScanPage(key,title,blurb){
     scanTable(scan[key])+'<div style="margin-top:24px;"><div class="sect-h" style="margin-bottom:10px;">Narrative · weekly research</div>'+md(pages[key+"_md"])+'</div>';
 }
 
+function deconRequestBox(){
+  return '<div style="background:rgba(20,38,63,0.04);border:1px solid var(--line);border-radius:3px;padding:12px 14px;margin-bottom:16px;">'+
+    '<div class="eyebrow" style="margin-bottom:7px;">Request a deconstruction</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;"><input id="deconreq" type="text" placeholder="company or theme — e.g. Stripe, nuclear SMRs, OpenAI" style="flex:1;min-width:200px;background:#fff;border:1px solid var(--line);color:var(--navy);border-radius:3px;padding:8px 11px;font-family:Geist Mono,monospace;font-size:12px;">'+
+    '<button id="deconsub" class="go" style="padding:8px 16px;">Queue</button></div>'+
+    '<div id="deconmsg" class="mono" style="font-size:10.5px;color:var(--slate);margin-top:8px;">Queued requests are fulfilled on the next daily run (or when you run /keel-thesis). Drill into any deconstruction\\'s "drill-down candidates" by requesting that part here.</div></div>';
+}
+
 function renderDecon(){
   const list=SNAP.deconstructions||[];
-  if(!list.length) return '<div class="sect-h" style="margin-bottom:6px;">Thesis deconstruction</div>'+
-    '<div class="dim">No deconstructions yet. Ask Claude: "deconstruct &lt;company or theme&gt;" '+
-    '(e.g. SpaceX, the AI-power buildout, GLP-1 drugs). It breaks the business into segments, '+
-    'maps public suppliers/customers/competitors, pulls each ticker\\'s regime &amp; relative-strength read, '+
-    'and frames long/short/ETF exposure — as a learning tool, not advice.</div>';
+  if(!list.length) return '<div class="sect-h" style="margin-bottom:6px;">Thesis deconstruction</div>'+deconRequestBox()+
+    '<div class="dim">No deconstructions yet — queue one above (or run /keel-thesis locally). Each breaks a business into segments, value creation, shareholder value, growth, fundamentals, the public value chain, live tape, and exposure ideas.</div>';
   if(!deconSlug || !list.find(d=>d.slug===deconSlug)) deconSlug=list[0].slug;
   const sel=list.find(d=>d.slug===deconSlug);
   let picker='<div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:16px;">';
   list.forEach(d=>{ picker+='<button data-slug="'+esc(d.slug)+'" class="deconpick" style="background:'+(d.slug===deconSlug?'var(--navy)':'transparent')+';color:'+(d.slug===deconSlug?'var(--paper)':'var(--slate)')+';border:1px solid var(--line);border-radius:3px;padding:5px 12px;cursor:pointer;font-family:Geist Mono,monospace;font-size:11.5px;">'+esc(d.title)+'</button>'; });
   picker+='</div>';
-  return '<div class="sect-h" style="margin-bottom:12px;">Thesis deconstruction · learning tool, not advice</div>'+picker+md(sel.md);
+  return '<div class="sect-h" style="margin-bottom:12px;">Thesis deconstruction · learning tool, not advice</div>'+deconRequestBox()+picker+md(sel.md);
 }
 
 function renderPanels(){
@@ -499,7 +504,15 @@ function render(){
   else if(view==="reports") html=renderReports();
   $("view").innerHTML=html;
   if(view==="reports"){ $("tb").onclick=()=>{reportTab="brief";render();}; $("trc").onclick=()=>{reportTab="recap";render();}; $("tv").onclick=()=>{reportTab="review";render();}; }
-  if(view==="decon"){ document.querySelectorAll(".deconpick").forEach(b=>b.onclick=()=>{deconSlug=b.dataset.slug;render();}); }
+  if(view==="decon"){
+    document.querySelectorAll(".deconpick").forEach(b=>b.onclick=()=>{deconSlug=b.dataset.slug;render();});
+    const sub=$("deconsub"), inp=$("deconreq"), msg=$("deconmsg");
+    if(sub&&inp){ const go=async()=>{ const v=inp.value.trim(); if(!v) return; sub.disabled=true; if(msg)msg.textContent="queuing…";
+      try{ const r=await fetch("/api/kobewould/request",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({subject:v})}); const j=await r.json(); if(msg)msg.textContent=j.ok?("Queued “"+j.queued+"”. "+j.pending+" pending — fulfilled on the next daily run."):("error: "+(j.error||r.status)); inp.value=""; }
+      catch(e){ if(msg)msg.textContent="error: "+e.message; } finally{ sub.disabled=false; } };
+      sub.onclick=go; inp.onkeydown=(e)=>{ if(e.key==="Enter") go(); };
+    }
+  }
   if(view==="panels"){ document.querySelectorAll(".panelpick").forEach(b=>b.onclick=()=>{panelSlug=b.dataset.slug;render();}); }
   if(view==="markets"){ document.querySelectorAll(".mgpick").forEach(b=>b.onclick=()=>{marketGroup=b.dataset.mg;render();}); }
   if(view==="rebalance"){ const inp=$("rebamt"); if(inp) inp.oninput=()=>{ rebalAmount=Math.max(0,Number(inp.value)||0); const v=$("view"); const pos=inp.selectionStart; render(); const n=$("rebamt"); if(n){ n.focus(); try{n.setSelectionRange(pos,pos);}catch(e){} } }; }
