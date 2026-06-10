@@ -180,9 +180,18 @@ const esc = s => String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").repl
 const C = { navy:"#14263f", wine:"#8a2742", sage:"#5f7a4d", honey:"#b07d2a",
             brick:"#9c3a2b", assist:"#1f3a5f", mute:"#9a8f7a", slate:"#7a8694" };
 let SNAP=null, view=location.hash.slice(1)||"mission", reportTab="brief";
-const VIEWS=[["mission","Mission"],["decon","Deconstruct"],["panels","Panels"],["theses","Theses"],["m7a","M7A"],["smb","SMB"],
+const VIEWS=[["mission","Mission"],["markets","Markets"],["rebalance","Rebalance"],["decon","Deconstruct"],["panels","Panels"],["theses","Theses"],["m7a","M7A"],["smb","SMB"],
              ["opps","Opportunities"],["reads","Reads"],["reports","Reports"]];
-let deconSlug=null, panelSlug=null;
+let deconSlug=null, panelSlug=null, marketGroup="strongest", rebalAmount=null, layoutOpen=false;
+function loadLayout(){ try{ return JSON.parse(localStorage.getItem("kobe_layout")||"{}"); }catch(e){ return {}; } }
+function saveLayout(l){ try{ localStorage.setItem("kobe_layout", JSON.stringify(l)); }catch(e){} }
+function orderedViews(){
+  const l=loadLayout(); const hidden=new Set(l.hidden||[]);
+  const order=(l.order&&l.order.length)?l.order:VIEWS.map(v=>v[0]);
+  const known=new Set(VIEWS.map(v=>v[0]));
+  const seq=order.filter(k=>known.has(k)).concat(VIEWS.map(v=>v[0]).filter(k=>!order.includes(k)));
+  return seq.map(k=>VIEWS.find(v=>v[0]===k)).filter(v=>v && !hidden.has(v[0]));
+}
 const cls = v => v>=0 ? "green" : "red";
 
 function md(src){
@@ -389,6 +398,81 @@ function renderPanels(){
   return '<div class="sect-h" style="margin-bottom:12px;">Research panels · benchmarking &amp; context</div>'+picker+md(sel.md);
 }
 
+function rsBar(rs){
+  const v=Number(rs)||0; const w=Math.min(50,Math.abs(v))/50*100; const pos=v>=0;
+  return '<div style="display:inline-block;width:90px;height:9px;background:rgba(20,38,63,0.07);border-radius:3px;position:relative;vertical-align:middle;">'+
+    '<div style="position:absolute;'+(pos?'left:50%':'right:50%')+';top:0;height:100%;width:'+(w/2)+'%;background:'+(pos?C.sage:C.brick)+';border-radius:3px;"></div>'+
+    '<div style="position:absolute;left:50%;top:-2px;width:1px;height:13px;background:rgba(20,38,63,0.25);"></div></div>';
+}
+
+function marketRows(rows){
+  if(!rows||!rows.length) return '<tr><td colspan="6" class="dim">no data</td></tr>';
+  return rows.filter(r=>!r.error).map(r=>
+    '<tr><td style="font-weight:600;">'+esc(r.ticker)+'</td><td class="dim" style="color:var(--slate);">'+esc(r.name||"")+
+    '</td><td>'+esc(r.regime)+'</td><td>'+fmt(r.adx,0)+
+    '</td><td class="'+cls(r.ret_3m_pct)+'">'+fmt(r.ret_3m_pct,1)+'</td>'+
+    '<td>'+rsBar(r.rs_3m_pct)+' <span class="'+cls(r.rs_3m_pct)+'" style="font-size:11px;">'+fmt(r.rs_3m_pct,1)+'</span></td></tr>'
+  ).join("");
+}
+
+function renderMarkets(){
+  const m=SNAP.markets;
+  if(!m) return '<div class="sect-h" style="margin-bottom:6px;">Global markets</div><div class="dim">Markets board populates with the 07:00 brief (or keel markets). Regions, economies and asset classes ranked by relative strength.</div>';
+  const labels=m.group_labels||{};
+  const tabs=[["strongest","Strongest"]].concat(Object.keys(m.groups||{}).map(k=>[k,labels[k]||k]));
+  let pick='<div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px;">';
+  tabs.forEach(([k,l])=>{ pick+='<button data-mg="'+k+'" class="mgpick" style="background:'+(marketGroup===k?'var(--navy)':'transparent')+';color:'+(marketGroup===k?'var(--paper)':'var(--slate)')+';border:1px solid var(--line);border-radius:3px;padding:5px 12px;cursor:pointer;font-family:Geist Mono,monospace;font-size:11.5px;">'+esc(l)+'</button>'; });
+  pick+='</div>';
+  const rows = marketGroup==="strongest" ? m.strongest : (m.groups[marketGroup]||[]);
+  const gen=m.generated_at?' · '+m.generated_at.slice(0,10)+' · vs '+esc(m.benchmark):'';
+  return '<div class="sect-h" style="margin-bottom:6px;">Global markets · trend &amp; relative strength'+gen+'</div>'+
+    '<div class="sect-meta" style="margin-bottom:12px;">Where capital is flowing across economies and asset classes. RS = 3-month performance vs the world benchmark.</div>'+pick+
+    '<table><tr><th>ticker</th><th>market</th><th>regime</th><th>ADX</th><th style="text-align:left;">3m %</th><th>relative strength</th></tr>'+marketRows(rows)+'</table>';
+}
+
+function renderRebalance(){
+  const rb=SNAP.rebalance;
+  if(!rb||!rb.rows) return '<div class="sect-h" style="margin-bottom:6px;">Rebalance</div><div class="dim">Rebalance planner populates once the book + regime board are live.</div>';
+  const amt = (rebalAmount==null) ? rb.add_amount : rebalAmount;
+  const totalScore = rb.rows.reduce((s,r)=>s+(r.score||0),0)||1;
+  let remaining=amt;
+  const computed = rb.rows.slice().sort((a,b)=>(b.score||0)-(a.score||0)).map(r=>{
+    const target=amt*((r.score||0)/totalScore);
+    const alloc=Math.max(0,Math.min(target, r.cap_usd, remaining));
+    remaining=Math.round((remaining-alloc)*100)/100;
+    return Object.assign({}, r, {alloc:alloc, wt: amt?alloc/amt*100:0});
+  });
+  const cash=Math.max(0,remaining);
+  let rowsHtml=computed.map(r=>{
+    const barw=Math.min(100,r.wt);
+    return '<tr><td style="font-weight:600;">'+esc(r.instrument)+'</td><td>'+esc(r.regime)+
+      '</td><td>'+(r.favorable?'<span class="green">favorable</span>':'<span class="dim">off-regime</span>')+
+      '</td><td style="text-align:right;">$'+fmt(r.alloc)+'</td>'+
+      '<td style="width:160px;"><div style="display:flex;align-items:center;gap:6px;"><div style="flex:1;height:9px;background:rgba(20,38,63,0.07);border-radius:3px;"><div style="height:100%;width:'+barw+'%;background:var(--navy);border-radius:3px;"></div></div><span style="font-size:11px;">'+fmt(r.wt,0)+'%</span></div></td></tr>';
+  }).join("");
+  rowsHtml+='<tr><td style="font-weight:600;">cash</td><td colspan="2" class="dim">hold</td><td style="text-align:right;">$'+fmt(cash)+'</td><td></td></tr>';
+  return '<div class="sect-h" style="margin-bottom:6px;">Rebalance · risk-aware allocation</div>'+
+    '<div class="sect-meta" style="margin-bottom:14px;">Enter an amount to deploy; the planner weights favorable-regime instruments by confidence, respecting notional &amp; correlation caps. Suggestion only — entries still clear the risk engine.</div>'+
+    '<div style="margin-bottom:14px;"><span class="eyebrow">Amount to deploy</span><br><input id="rebamt" type="number" value="'+amt+'" min="0" step="50" style="background:#fff;border:1px solid var(--line);color:var(--navy);border-radius:3px;padding:8px 11px;font-family:Geist Mono,monospace;width:140px;margin-top:5px;"> <span class="dim">equity $'+fmt(rb.equity)+'</span></div>'+
+    '<table><tr><th>instrument</th><th>regime</th><th>fit</th><th style="text-align:right;">suggested</th><th>weight</th></tr>'+rowsHtml+'</table>'+
+    '<div class="sect-meta" style="margin-top:12px;">'+(rb.notes||[]).map(esc).join(' · ')+'</div>';
+}
+
+function renderLayout(){
+  const l=loadLayout(); const hidden=new Set(l.hidden||[]);
+  const ordered=orderedViews().map(v=>v[0]);
+  const all=ordered.concat(VIEWS.map(v=>v[0]).filter(k=>!ordered.includes(k)));
+  let html='<div class="band"><div class="t" style="padding:0;">Customize layout</div></div><div class="band-body"><div class="dim" style="margin-bottom:10px;">Show/hide tabs and reorder. Saved on this device.</div>';
+  all.forEach((k,i)=>{ const lbl=(VIEWS.find(v=>v[0]===k)||[k,k])[1]; const vis=!hidden.has(k);
+    html+='<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-top:1px solid var(--hair);">'+
+      '<label style="flex:1;cursor:pointer;"><input type="checkbox" class="lvis" data-k="'+k+'" '+(vis?'checked':'')+'> '+esc(lbl)+'</label>'+
+      '<button class="lup" data-k="'+k+'" style="background:transparent;border:1px solid var(--line);border-radius:3px;cursor:pointer;color:var(--slate);">↑</button>'+
+      '<button class="ldn" data-k="'+k+'" style="background:transparent;border:1px solid var(--line);border-radius:3px;cursor:pointer;color:var(--slate);">↓</button></div>';
+  });
+  html+='<button id="lreset" style="margin-top:12px;background:transparent;border:1px solid var(--line);border-radius:3px;padding:5px 12px;cursor:pointer;color:var(--slate);font-family:Geist Mono,monospace;">reset to default</button></div>';
+  return html;
+}
+
 function renderReports(){
   const r=SNAP.reports||{}, map={brief:r.brief_md,recap:r.recap_md,review:r.review_md};
   const tab=(id,k,lbl)=>'<button id="'+id+'" class="'+(reportTab===k?"on":"")+'" style="background:transparent;border:none;border-bottom:2px solid '+(reportTab===k?"var(--wine)":"transparent")+';color:'+(reportTab===k?"var(--navy)":"var(--slate)")+';font:inherit;font-weight:600;cursor:pointer;margin-right:14px;padding:4px 2px;">'+lbl+'</button>';
@@ -397,10 +481,14 @@ function renderReports(){
 
 function render(){
   if(!SNAP) return;
-  $("nav").innerHTML=VIEWS.map(([k,l])=>'<button data-v="'+k+'" class="'+(view===k?"on":"")+'">'+l+'</button>').join("");
+  $("nav").innerHTML=orderedViews().map(([k,l])=>'<button data-v="'+k+'" class="'+(view===k?"on":"")+'">'+l+'</button>').join("")
+    +'<button data-v="layout" class="'+(view==="layout"?"on":"")+'" title="customize layout" style="margin-left:auto;">⚙</button>';
   document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{view=b.dataset.v;location.hash=view;render();});
   let html="";
   if(view==="mission") html=renderMission();
+  else if(view==="markets") html=renderMarkets();
+  else if(view==="rebalance") html=renderRebalance();
+  else if(view==="layout") html=renderLayout();
   else if(view==="decon") html=renderDecon();
   else if(view==="panels") html=renderPanels();
   else if(view==="theses") html=renderTheses();
@@ -413,6 +501,16 @@ function render(){
   if(view==="reports"){ $("tb").onclick=()=>{reportTab="brief";render();}; $("trc").onclick=()=>{reportTab="recap";render();}; $("tv").onclick=()=>{reportTab="review";render();}; }
   if(view==="decon"){ document.querySelectorAll(".deconpick").forEach(b=>b.onclick=()=>{deconSlug=b.dataset.slug;render();}); }
   if(view==="panels"){ document.querySelectorAll(".panelpick").forEach(b=>b.onclick=()=>{panelSlug=b.dataset.slug;render();}); }
+  if(view==="markets"){ document.querySelectorAll(".mgpick").forEach(b=>b.onclick=()=>{marketGroup=b.dataset.mg;render();}); }
+  if(view==="rebalance"){ const inp=$("rebamt"); if(inp) inp.oninput=()=>{ rebalAmount=Math.max(0,Number(inp.value)||0); const v=$("view"); const pos=inp.selectionStart; render(); const n=$("rebamt"); if(n){ n.focus(); try{n.setSelectionRange(pos,pos);}catch(e){} } }; }
+  if(view==="layout"){
+    const l=loadLayout(); l.hidden=l.hidden||[]; l.order=orderedViews().map(v=>v[0]).concat(VIEWS.map(v=>v[0]).filter(k=>!orderedViews().map(v=>v[0]).includes(k)));
+    document.querySelectorAll(".lvis").forEach(c=>c.onchange=()=>{ const k=c.dataset.k; const h=new Set(loadLayout().hidden||[]); if(c.checked) h.delete(k); else h.add(k); const cur=loadLayout(); cur.hidden=Array.from(h); saveLayout(cur); render(); });
+    const move=(k,dir)=>{ const cur=loadLayout(); let ord=(cur.order&&cur.order.length)?cur.order.slice():VIEWS.map(v=>v[0]); ord=ord.filter(x=>VIEWS.find(v=>v[0]===x)); VIEWS.forEach(v=>{ if(!ord.includes(v[0])) ord.push(v[0]); }); const i=ord.indexOf(k); const j=i+dir; if(i<0||j<0||j>=ord.length) return; const t=ord[i]; ord[i]=ord[j]; ord[j]=t; cur.order=ord; saveLayout(cur); render(); };
+    document.querySelectorAll(".lup").forEach(b=>b.onclick=()=>move(b.dataset.k,-1));
+    document.querySelectorAll(".ldn").forEach(b=>b.onclick=()=>move(b.dataset.k,1));
+    const rb=$("lreset"); if(rb) rb.onclick=()=>{ saveLayout({}); render(); };
+  }
 }
 
 function clock(){
