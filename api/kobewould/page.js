@@ -3,7 +3,7 @@
 // "provenance bands" marking the surfaces an LLM touched (Posture, Decision
 // Journal) while the deterministic money path stays warm paper.
 // READ-ONLY by construction (ADR-018): kill/mode are indicators, not buttons.
-import { configured, env, isAuthed, readCred, sendHtml, setupEnabled } from "./_lib.js";
+import { blobAvailable, configured, env, isAuthed, readCred, sendHtml, setupEnabled } from "./_lib.js";
 
 const FONTS = `<link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -111,6 +111,16 @@ const LOGIN = SHELL(`<div class="wrap"><div class="center"><form method="POST" a
   <div class="mono" style="font-size:10.5px;color:var(--slate);margin-bottom:18px;border-left:2px solid var(--wine);padding-left:11px;">local-first trading OS · operator terminal</div>
   <input type="password" name="password" autofocus autocomplete="current-password" aria-label="password">
   <button class="go" type="submit">ENTER</button>
+  <div class="mono" style="font-size:10.5px;color:var(--slate);margin-top:16px;"><a href="/kobewould?setup=1" style="color:var(--wine);">First time, or forgot your password? Set / reset it →</a></div>
+</form></div></div>`);
+
+const CHANGE = SHELL(`<div class="wrap"><div class="center"><form method="POST" action="/api/kobewould/change-password" style="width:300px;max-width:100%;">
+  <div style="font-family:'Big Shoulders Display',sans-serif;font-weight:800;font-size:46px;letter-spacing:.5px;color:var(--navy);">KOBE</div>
+  <div class="mono" style="font-size:10.5px;color:var(--slate);margin-bottom:16px;border-left:2px solid var(--wine);padding-left:11px;">change password</div>
+  <div class="setup-field"><label>new password (min 8)</label><input type="password" name="password" minlength="8" required autofocus autocomplete="new-password"></div>
+  <div class="setup-field"><label>confirm</label><input type="password" name="confirm" minlength="8" required autocomplete="new-password"></div>
+  <button class="go" type="submit" style="margin:6px 0 0;width:100%;">CHANGE PASSWORD</button>
+  <div class="mono" style="font-size:10px;color:var(--slate);margin-top:14px;"><a href="/kobewould" style="color:var(--slate);">← back to terminal</a></div>
 </form></div></div>`);
 
 const SETUP_INFRA = SHELL(`<div class="wrap"><div class="center"><div>
@@ -158,7 +168,7 @@ const APP = SHELL(`<div class="wrap">
 
   <!-- FOOTER -->
   <div style="display:flex;align-items:center;justify-content:space-between;margin-top:30px;padding-top:14px;border-top:2px solid var(--navy);flex-wrap:wrap;gap:12px;">
-    <div class="mono" style="font-size:10.5px;color:var(--slate);">read-only mirror · push-only · control stays local · <span id="age"></span></div>
+    <div class="mono" style="font-size:10.5px;color:var(--slate);">read-only mirror · push-only · <a href="/kobewould?change=1" style="color:var(--slate);">change password</a> · <span id="age"></span></div>
     <div class="mono" style="font-size:10.5px;color:var(--slate);display:flex;gap:14px;">
       <span><span class="wine">●</span> Kraken</span><span><span class="assist">●</span> Alpaca paper</span><span><span class="slate">○</span> ccxt gated</span>
     </div>
@@ -450,8 +460,12 @@ refresh(); setInterval(refresh,60000);
 
 export default async function handler(req, res) {
   if (!configured()) return sendHtml(res, 200, SETUP_INFRA);
-  if (isAuthed(req, env("KOBEWOULD_SECRET"))) return sendHtml(res, 200, APP);
-  const forceSetup = /[?&]setup=1/.test(req.url || "");
+  const url = req.url || "";
+  if (isAuthed(req, env("KOBEWOULD_SECRET"))) {
+    if (/[?&]change=1/.test(url) && blobAvailable()) return sendHtml(res, 200, CHANGE);
+    return sendHtml(res, 200, APP);
+  }
+  const forceSetup = /[?&]setup=1/.test(url);
   if (setupEnabled()) {
     const cred = await readCred();
     if (!cred || forceSetup) return sendHtml(res, 200, SETUP);
