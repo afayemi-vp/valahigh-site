@@ -254,7 +254,7 @@ function renderStatline(){
   const postureSub = posture ? ((posture.stand_down&&posture.stand_down.length?('down: '+posture.stand_down.join(", ")):'')+(posture.note?(' · '+esc(posture.note)):'')) : 'no LLM reduction today';
   $("statline").innerHTML = first +
     stat("Day P&amp;L", (r.day_pnl>=0?"+":"")+"$"+fmt(Math.abs(r.day_pnl)), r.day_pnl>=0?C.sage:C.brick, "realized today") +
-    stat("Risk budget", "$"+fmt(r.risk_budget_usd), C.navy, fmt(r.per_trade_risk_pct,2)+"% eq · $"+fmt(r.open_risk_usd)+" open") +
+    stat("Risk budget", "$"+fmt(r.risk_budget_usd), C.navy, fmt(r.per_trade_risk_pct,2)+"% eq · "+esc((SNAP.risk_profile||{}).active||"balanced")) +
     stat("High-water", "$"+fmt(hwm), C.navy, "max DD "+fmt(r.drawdown_pct,1)+"%") +
     stat("Posture · LLM edge", postureBig, posture?C.honey:C.slate, postureSub||"reduce-only");
 }
