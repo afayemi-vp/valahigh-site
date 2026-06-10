@@ -2,7 +2,7 @@
 // The raw blob URL (which embeds a token-derived secret path) never reaches
 // the browser.
 import { list } from "@vercel/blob";
-import { blobPrefix, configured, env, isAuthed } from "./_lib.js";
+import { blobAvailable, blobPrefix, configured, env, isAuthed } from "./_lib.js";
 
 export default async function handler(req, res) {
   if (!configured()) {
@@ -11,6 +11,11 @@ export default async function handler(req, res) {
   }
   if (!isAuthed(req, env("KOBEWOULD_SECRET"))) {
     res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+  if (!blobAvailable()) {
+    // storage not connected yet — tell the page so it shows guidance, not 502
+    res.status(503).json({ error: "storage_not_connected" });
     return;
   }
   try {

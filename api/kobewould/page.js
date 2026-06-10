@@ -401,8 +401,13 @@ function clock(){
 async function refresh(){
   const res=await fetch("/api/kobewould/data",{cache:"no-store"});
   if(res.status===401){ location.reload(); return; }
-  if(res.status===404){ $("view").innerHTML='<div class="dim">no snapshot published yet — start keel with publish env vars set.</div>'; return; }
-  if(!res.ok){ $("view").innerHTML='<div class="dim">error '+res.status+'</div>'; return; }
+  if(res.status===404){ $("view").innerHTML='<div class="dim">no snapshot published yet — run <code>keel report brief</code> on your machine (it pushes the first snapshot).</div>'; $("age").textContent="awaiting first snapshot"; return; }
+  if(res.status===503){ let j={}; try{ j=await res.json(); }catch(e){}
+    if(j.error==="storage_not_connected"){
+      $("view").innerHTML='<div class="band"><div class="t" style="padding:0;">⚙ storage not connected</div></div><div class="band-body"><div class="md"><p>The terminal is live and you are logged in — but the data pipe (Vercel Blob) is not connected yet, so there is nothing to show.</p><h3>One-time activation</h3><ul><li>Open the Vercel dashboard → your project <b>valahigh-site</b> → <b>Storage</b></li><li>Connect the <b>kobewould-mirror</b> Blob store to the project</li><li>Redeploy</li></ul><p>Until then, use the <b>local dashboard</b> on your machine: <code>keel api</code> → <code>http://127.0.0.1:8400</code> — full data + control buttons, no Blob needed.</p></div></div>';
+      $("age").textContent="storage not connected"; return; }
+    $("view").innerHTML='<div class="dim">service unavailable (503)</div>'; return; }
+  if(!res.ok){ $("view").innerHTML='<div class="dim">error '+res.status+' — try again shortly</div>'; return; }
   SNAP=await res.json();
   const killed=SNAP.kill_switch||SNAP.halted;
   const age=(Date.now()-Date.parse(SNAP.generated_at))/60000;
