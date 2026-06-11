@@ -26,7 +26,10 @@ export default async function handler(req, res) {
   try {
     await writeCred(makeCred(password));
   } catch (e) {
-    res.status(502).json({ error: `could not save credential: ${e.message}` });
+    if (/suspended|quota/i.test(e.message)) {
+      return fail("Storage quota hit — password changes are paused. Log in with your original password; everything else works.");
+    }
+    res.status(503).json({ error: `could not save credential: ${e.message}` });
     return;
   }
   res.setHeader("Set-Cookie", makeCookie(env("KOBEWOULD_SECRET")));

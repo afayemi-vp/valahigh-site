@@ -871,6 +871,7 @@ async function refresh(){
   let banners="";
   if(killed) banners+='<div class="banner" style="background:#9c3a2b;color:#f4ecdd;"><span class="dot" style="background:#f4ecdd;animation:kobepulse 1s steps(1) infinite;"></span><b style="letter-spacing:1.5px;">'+(SNAP.kill_switch?"KILL ENGAGED":"HALTED")+'</b><span style="font-size:11.5px;color:#f0d9cf;">'+esc(SNAP.halt_reason||"all new entries blocked · exits managed · clear locally")+'</span></div>';
   if(age>30) banners+='<div class="banner" style="background:rgba(176,125,42,0.12);color:'+C.honey+';border:1px solid rgba(176,125,42,0.4);">⚠ snapshot '+fmt(age,0)+' min old — keel or its publisher may be down</div>';
+  if(SNAP.storage==="degraded") banners+='<div class="banner" style="background:rgba(176,125,42,0.12);color:'+C.honey+';border:1px solid rgba(176,125,42,0.4);">⚠ running on backup store (storage quota) — data is live, but web Controls &amp; request queueing are paused. The local dashboard (127.0.0.1:8400) has full control.</div>';
   $("banners").innerHTML=banners;
   renderControls(killed);
   renderStatline();
@@ -896,7 +897,7 @@ function renderControls(killed){
     document.querySelectorAll(".cmd").forEach(x=>x.disabled=true);
     $("cmdmsg").textContent="sending…";
     try{ const r=await fetch("/api/kobewould/command",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:a})}); const j=await r.json();
-      $("cmdmsg").textContent=j.ok?("queued “"+j.queued+"” — applies within ~1 min on your machine"):("error: "+(j.error||r.status)); }
+      $("cmdmsg").textContent=j.ok?("queued “"+j.queued+"” — applies within ~3 min on your machine"):("error: "+(j.error||r.status)); }
     catch(e){ $("cmdmsg").textContent="error: "+e.message; }
     finally{ document.querySelectorAll(".cmd").forEach(x=>x.disabled=false); }
   });

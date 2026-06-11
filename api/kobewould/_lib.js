@@ -99,24 +99,30 @@ export function blobPrefix(token) {
 }
 const CRED_NAME = "auth-cred.json";
 
+let _credCache = { at: 0, cred: undefined };  // 10-min cache: list() is a quota-heavy op
 export async function readCred() {
   if (!blobAvailable()) return null;
+  if (_credCache.cred !== undefined && Date.now() - _credCache.at < 10 * 60 * 1000) {
+    return _credCache.cred;
+  }
   try {
     const { list } = await import("@vercel/blob");
     const { blobs } = await list({ prefix: blobPrefix(env("KEEL_PUBLISH_TOKEN")) + "/" + CRED_NAME });
-    if (!blobs.length) return null;
-    const r = await fetch(blobs[0].url, { cache: "no-store" });
-    return await r.json();
+    const cred = blobs.length ? await (await fetch(blobs[0].url, { cache: "no-store" })).json() : null;
+    _credCache = { at: Date.now(), cred };
+    return cred;
   } catch {
-    return null;
+    return null;   // not cached: a transient failure shouldn't stick for 10 min
   }
 }
+export function bustCredCache() { _credCache = { at: 0, cred: undefined }; }
 export async function writeCred(cred) {
   const { put } = await import("@vercel/blob");
   await put(`${blobPrefix(env("KEEL_PUBLISH_TOKEN"))}/${CRED_NAME}`, JSON.stringify(cred), {
     access: "public", addRandomSuffix: false, allowOverwrite: true,
     contentType: "application/json", cacheControlMaxAge: 0,
   });
+  bustCredCache();
 }
 
 // ── config / responses ───────────────────────────────────────────────────
