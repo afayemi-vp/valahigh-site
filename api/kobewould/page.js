@@ -170,6 +170,7 @@ const APP = SHELL(`<div class="wrap">
   <nav id="nav"></nav>
   <div id="view">loading…</div>
   <div id="tkmodal" style="display:none;position:fixed;inset:0;background:rgba(20,38,63,0.4);z-index:50;align-items:flex-start;justify-content:center;padding:40px 14px;overflow:auto;"></div>
+  <div id="gxtip" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:55;background:var(--paper);border-top:2px solid var(--wine);box-shadow:0 -6px 24px rgba(20,38,63,0.18);padding:14px 16px;"></div>
 
   <!-- FOOTER -->
   <div style="display:flex;align-items:center;justify-content:space-between;margin-top:30px;padding-top:14px;border-top:2px solid var(--navy);flex-wrap:wrap;gap:12px;">
@@ -186,6 +187,46 @@ const C = { navy:"#14263f", wine:"#8a2742", sage:"#5f7a4d", honey:"#b07d2a",
             brick:"#9c3a2b", assist:"#1f3a5f", mute:"#9a8f7a", slate:"#7a8694" };
 const GLOSSARY = ${GLOSS_JSON};
 let glossQ = "";
+// plain-English tap-to-explain for metrics & acronyms (keys lowercase, single word)
+const TIPS = {
+  rs:"Relative Strength — how much it has beaten (+) or lagged (−) the market over 3 months. Positive = a leader money is flowing into.",
+  adx:"Trend strength, 0–100. 22+ means a real trend is in place; under 20 is choppy / no real trend.",
+  atr:"Average True Range — the stock's typical move per bar. Used to size positions and place stops.",
+  ema20:"The 20-bar moving average — a fast-reacting trend line.",
+  ema50:"The 50-bar moving average — the 'is it above water?' trend line. Price above it = uptrend.",
+  ema:"A moving average that weights recent prices more — a smooth trend line.",
+  ext:"Extension — how far price has stretched from its average, measured in ATRs. A big number = overextended.",
+  extension:"How far price has stretched from its average, in ATRs. Big = overextended, pullback risk rises.",
+  conf:"Confidence — how sure the model is about the regime label, from 0 to 1.",
+  regime:"The market's current character: trending, ranging (sideways), squeeze, or choppy.",
+  parabolic:"A near-vertical, accelerating rise — powerful but stretched; tends to snap back hard when it breaks.",
+  drawdown:"How far you're down from your peak balance, as a %.",
+  squeeze:"Volatility compressed tight — often comes right before a big move.",
+  donchian:"The highest-high / lowest-low over the last N bars — a breakout reference level.",
+  rsi:"A 0–100 momentum gauge; extremes flag overbought (high) or oversold (low).",
+  bollinger:"Bands drawn ±2 standard-deviations around a moving average; narrow bands = a 'squeeze'.",
+  momentum:"A strategy that bets a strong move keeps going.",
+  breakout:"Price pushing past a prior high or range — a momentum trigger.",
+  hbm:"High-Bandwidth Memory — the fast stacked memory that AI accelerators need.",
+  dram:"The main working memory in servers and PCs (Micron is a top maker).",
+  asic:"A custom chip built for one job — e.g. Broadcom/Google's in-house AI accelerators.",
+  hyperscaler:"A giant cloud operator — Amazon, Microsoft, Google — the biggest AI spenders.",
+  etf:"A basket of stocks you trade like a single stock (SPY = the whole S&P 500).",
+};
+const TIP_RE = new RegExp("\\\\b(" + Object.keys(TIPS).join("|") + ")\\\\b", "gi");
+function gx(text){ return esc(text).replace(TIP_RE, function(m){
+  return '<span class="gx" data-k="'+m.toLowerCase()+'" style="border-bottom:1px dotted var(--wine);cursor:help;">'+m+'</span>'; }); }
+function showGx(key){
+  const def=TIPS[key]; if(!def) return; const box=$("gxtip"); if(!box) return;
+  box.innerHTML='<div style="max-width:560px;margin:0 auto;display:flex;gap:12px;align-items:flex-start;">'+
+    '<div style="flex:1;"><div style="font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.5px;color:var(--wine);">'+esc(key)+'</div>'+
+    '<div style="font-size:13px;line-height:1.5;margin-top:4px;">'+esc(def)+'</div>'+
+    '<button id="gxfull" data-k="'+esc(key)+'" style="margin-top:8px;background:none;border:none;color:var(--wine);font-weight:600;font-size:12px;cursor:pointer;padding:0;">Full glossary entry ▸</button></div>'+
+    '<button id="gxx" style="background:none;border:1px solid var(--line);border-radius:3px;padding:4px 9px;cursor:pointer;">✕</button></div>';
+  box.style.display="block";
+  $("gxx").onclick=()=>{ box.style.display="none"; };
+  const f=$("gxfull"); if(f) f.onclick=()=>{ box.style.display="none"; view="glossary"; glossQ=key; render(); };
+}
 const FORMULAS = [
   ["adx", "DX = 100·|+DI − −DI| / (+DI + −DI); ADX = Wilder-smoothed DX over 14 bars. ≥22 = real trend, <20 = chop."],
   ["atr", "TR = max(H−L, |H−Cprev|, |L−Cprev|); ATR = Wilder average of TR over 14. ATR% = ATR / price."],
@@ -549,18 +590,18 @@ function parseDecon(text){
 
 function nodeCard(n){
   const nameLine=n.name?'<span style="font-size:12.5px;font-weight:600;">'+esc(n.name)+'</span>':'';
-  const roleLine=n.role?'<div style="font-size:11px;line-height:1.4;color:var(--navy);opacity:.78;margin-top:5px;"><b>What it does:</b> '+esc(n.role)+'</div>':'';
+  const roleLine=n.role?'<div style="font-size:11px;line-height:1.4;color:var(--navy);opacity:.78;margin-top:5px;"><b>What it does:</b> '+gx(n.role)+'</div>':'';
   if(!n.mapped) return '<div style="border:1px dashed var(--line);background:rgba(20,38,63,0.02);padding:11px 12px;border-radius:2px;">'+
     '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;"><span style="font-family:Geist Mono,monospace;font-weight:700;font-size:13px;">'+esc(n.ticker)+'</span><span class="eyebrow" style="border:1px solid var(--line);padding:1px 5px;">No tape</span></div>'+
     (nameLine?'<div style="margin-top:6px;">'+nameLine+'</div>':'')+roleLine+
-    '<div style="font-size:11.5px;line-height:1.45;color:var(--slate);margin-top:7px;"><b>Why it matters:</b> '+esc(n.why)+'</div>'+
+    '<div style="font-size:11.5px;line-height:1.45;color:var(--slate);margin-top:7px;"><b>Why it matters:</b> '+gx(n.why)+'</div>'+
     '<button class="dnode" data-t="'+esc(n.ticker)+'" style="margin-top:10px;background:none;border:1px solid var(--line);color:var(--slate);cursor:pointer;font-size:11px;font-weight:600;padding:4px 11px;border-radius:2px;">Request map ▸</button></div>';
   const accent=n.kind==="oppose"?C.brick:C.sage, rsc=n.rsv>0?C.sage:n.rsv<0?C.brick:C.honey;
   const sp=n.spark?spark(n.spark,66,19)+'&nbsp;':'';
   return '<div class="tk" data-t="'+esc(n.ticker)+'" style="border:1px solid var(--line);border-left:3px solid '+accent+';background:var(--paper);padding:11px 12px;border-radius:2px;cursor:pointer;">'+
     '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-family:Geist Mono,monospace;font-weight:700;font-size:13px;border:1px solid var(--line);padding:1px 7px;border-radius:2px;">'+esc(n.ticker)+'</span><span class="mono" style="font-size:12px;font-weight:600;color:'+rsc+';">'+(n.rs!=null?"RS "+n.rs:"")+'</span></div>'+
     '<div style="display:flex;align-items:center;gap:9px;margin-top:9px;">'+sp+nameLine+'</div>'+roleLine+
-    '<div style="font-size:11.5px;line-height:1.45;color:var(--slate);margin-top:8px;"><b>Why it matters:</b> '+esc(n.why)+'</div>'+
+    '<div style="font-size:11.5px;line-height:1.45;color:var(--slate);margin-top:8px;"><b>Why it matters:</b> '+gx(n.why)+'</div>'+
     '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:11px;"><span class="mono" style="font-size:11px;font-weight:600;">'+esc(n.regime||"")+'</span><span style="color:var(--wine);font-size:11px;font-weight:600;">tap to read ▸</span></div></div>';
 }
 
@@ -591,7 +632,7 @@ function renderDecon(){
     '<div><span class="eyebrow" style="background:var(--navy);color:var(--paper);padding:2px 7px;">Model-written thesis</span>'+
     '<div style="font-family:Big Shoulders Display,sans-serif;font-weight:800;font-size:26px;margin-top:10px;">'+esc(sel.title)+'</div></div>'+
     '<button id="dxmode" style="background:none;border:1px solid var(--line);border-radius:3px;padding:5px 12px;cursor:pointer;font-size:11px;color:var(--wine);">≡ Full memo</button></div>'+
-    '<div style="font-size:15px;line-height:1.5;margin-top:10px;max-width:640px;">'+esc(p.thesis)+'</div>'+
+    '<div style="font-size:15px;line-height:1.5;margin-top:10px;max-width:640px;">'+gx(p.thesis)+'</div>'+
     '<div style="display:flex;gap:22px;margin-top:14px;flex-wrap:wrap;">'+
     '<div><div class="eyebrow">Mapped names</div><div class="mono" style="font-weight:600;font-size:16px;">'+(p.confirms.length+p.opposes.length)+'</div></div>'+
     '<div><div class="eyebrow">Confirming</div><div class="mono" style="font-weight:600;font-size:16px;color:'+C.sage+';">'+p.confirms.length+'</div></div>'+
@@ -600,7 +641,7 @@ function renderDecon(){
   html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:22px;margin-bottom:30px;">'+
     '<div>'+lane("Confirms the thesis",C.sage,p.confirms)+'</div>'+
     '<div><div style="display:flex;align-items:center;gap:9px;margin-bottom:14px;"><span style="width:9px;height:9px;background:'+C.honey+';"></span><span style="font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:'+C.honey+';">Market dynamics</span><span style="flex:1;height:1px;background:'+C.honey+';opacity:.3;"></span></div>'+
-    (p.dyn.length?p.dyn.map(d=>'<div style="display:flex;gap:11px;padding:12px 0;border-bottom:1px solid var(--hair);"><span class="mono" style="font-size:19px;font-weight:700;color:'+d.color+';width:16px;text-align:center;">'+d.arrow+'</span><div style="flex:1;"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><span style="font-size:12.5px;font-weight:600;">'+esc(d.label)+'</span><span class="eyebrow" style="color:'+d.color+';border:1px solid '+d.color+';padding:1px 5px;">'+d.tag+'</span></div><div style="font-size:11px;color:var(--slate);margin-top:4px;">'+esc(d.tail)+'</div></div></div>').join(""):'<div class="dim" style="font-size:12px;">—</div>')+'</div>'+
+    (p.dyn.length?p.dyn.map(d=>'<div style="display:flex;gap:11px;padding:12px 0;border-bottom:1px solid var(--hair);"><span class="mono" style="font-size:19px;font-weight:700;color:'+d.color+';width:16px;text-align:center;">'+d.arrow+'</span><div style="flex:1;"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><span style="font-size:12.5px;font-weight:600;">'+gx(d.label)+'</span><span class="eyebrow" style="color:'+d.color+';border:1px solid '+d.color+';padding:1px 5px;">'+d.tag+'</span></div><div style="font-size:11px;color:var(--slate);margin-top:4px;">'+gx(d.tail)+'</div></div></div>').join(""):'<div class="dim" style="font-size:12px;">—</div>')+'</div>'+
     '<div>'+lane("Opposes / counter-forces",C.brick,p.opposes)+'</div></div>';
   // business breakdown cards
   if(p.cards.length){
@@ -610,8 +651,8 @@ function renderDecon(){
       html+='<div style="background:var(--paper);padding:14px 15px;">'+
         '<div class="eyebrow" style="color:var(--wine);margin-bottom:10px;">'+esc(c.label)+'</div>'+
         (c.figs.length?'<div style="display:flex;gap:16px;margin-bottom:10px;">'+c.figs.map(f=>'<div class="mono" style="font-weight:700;font-size:21px;color:'+(String(f).indexOf("-")===0?C.brick:C.navy)+';">'+esc(f)+'</div>').join("")+'</div>':'')+
-        '<div style="font-size:12px;line-height:1.5;color:var(--slate);">'+esc(c.summary)+(c.full?'…':'')+'</div>'+
-        (c.full?'<div class="dxfull" data-i="'+i+'" style="display:none;font-size:12px;line-height:1.55;color:var(--slate);margin-top:9px;padding-top:9px;border-top:1px solid var(--hair);">'+esc(c.full)+'</div><button class="dxmore" data-i="'+i+'" style="margin-top:10px;background:none;border:none;cursor:pointer;font-size:11px;font-weight:600;color:var(--wine);padding:0;">Read full ▸</button>':'')+'</div>';
+        '<div style="font-size:12px;line-height:1.5;color:var(--slate);">'+gx(c.summary)+(c.full?'…':'')+'</div>'+
+        (c.full?'<div class="dxfull" data-i="'+i+'" style="display:none;font-size:12px;line-height:1.55;color:var(--slate);margin-top:9px;padding-top:9px;border-top:1px solid var(--hair);">'+gx(c.full)+'</div><button class="dxmore" data-i="'+i+'" style="margin-top:10px;background:none;border:none;cursor:pointer;font-size:11px;font-weight:600;color:var(--wine);padding:0;">Read full ▸</button>':'')+'</div>';
     });
     html+='</div>';
   }
@@ -854,7 +895,9 @@ function renderControls(killed){
     finally{ document.querySelectorAll(".cmd").forEach(x=>x.disabled=false); }
   });
 }
-document.addEventListener("click",(e)=>{ const t=e.target.closest&&e.target.closest(".tk"); if(t&&SNAP){ e.preventDefault(); showTk(t.dataset.t); } });
+document.addEventListener("click",(e)=>{
+  const g=e.target.closest&&e.target.closest(".gx"); if(g){ e.preventDefault(); e.stopPropagation(); showGx(g.dataset.k); return; }
+  const t=e.target.closest&&e.target.closest(".tk"); if(t&&SNAP){ e.preventDefault(); showTk(t.dataset.t); } });
 document.addEventListener("keydown",(e)=>{ if(e.key==="Escape") closeTk(); });
 clock(); setInterval(clock,1000);
 refresh(); setInterval(refresh,60000);
