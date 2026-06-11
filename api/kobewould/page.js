@@ -483,13 +483,36 @@ function _figs(text){
 }
 function _strip(s){ return (s||"").replace(/\\*\\*/g,"").replace(/[#\`]/g,"").trim(); }
 
+// regex-free helpers (template literal strips single backslashes)
+function _isTickerCell(s){ s=(s||"").trim(); if(s.length<2||s.length>14) return false; let a=false;
+  for(const ch of s){ if(ch>="a"&&ch<="z") return false; if(ch>="A"&&ch<="Z") a=true;
+    else if(ch!==" "&&ch!=="/"&&!(ch>="0"&&ch<="9")&&ch!==".") return false; } return a; }
+function _cleanName(s){ return (s||"").split(" vs ")[0].split(" / ")[0].split("/")[0].trim().slice(0,42); }
+function _num(s){ const v=parseFloat(String(s||"").replace(/[+%,]/g,"")); return isNaN(v)?null:v; }
+function _tableRows(lines){ return (lines||[]).filter(l=>l.trim().startsWith("|"))
+  .map(l=>l.split("|").slice(1,-1).map(x=>x.trim()))
+  .filter(c=>c.length>=2 && !c.every(x=>/^-*$/.test(x))); }
+
 function parseDecon(text){
   const idx=tickerIndex(), secs=_splitSections(text);
   const thesis=_strip((secs["Frame"]||secs["_intro"]||[]).join(" ")).slice(0,520);
-  const node=(ticker,why,kind)=>{ const r=idx[ticker]; return {
-    ticker, name:r?(r.name||""):"", why:_strip(why).slice(0,150), kind,
-    mapped:!!r, rs:r&&r.rs_3m_pct!=null?fmt(r.rs_3m_pct,1):null, rsv:r?r.rs_3m_pct:null,
-    spark:r?r.spark:null, regime:r?r.regime:null }; };
+  // build name/role (what the company does) + memo-local tape from the memo's own tables
+  const meta={}, mtape={};
+  Object.keys(secs).forEach(k=>{ const isTape=/tape read/i.test(k);
+    _tableRows(secs[k]).forEach(c=>{
+      let ti=-1; for(let i=0;i<c.length;i++){ if(_isTickerCell(c[i])){ ti=i; break; } }
+      if(ti<0) return; const t=_firstTicker(c[ti]); if(!t) return;
+      if(isTape && c.length>=6){ if(!mtape[t]) mtape[t]={rs:_num(c[c.length-1]),
+        regime:c[1], adx:c[3], ret:c[c.length-2]}; }
+      else if(!meta[t]){ meta[t]={name:_cleanName(ti>=1?c[0]:c[ti]), role:(c[ti+1]||"").slice(0,80)}; }
+    }); });
+  const node=(ticker,why,kind)=>{ const r=idx[ticker], mt=mtape[ticker], m=meta[ticker];
+    const rsv=(r&&r.rs_3m_pct!=null)?r.rs_3m_pct:(mt&&mt.rs!=null?mt.rs:null);
+    return {
+      ticker, name:(m&&m.name)||(r&&r.name)||"", role:(m&&m.role)||"",
+      why:_strip(why).slice(0,150), kind, mapped:!!(r||mt),
+      rs:rsv!=null?fmt(rsv,1):null, rsv,
+      spark:r?r.spark:null, regime:r?r.regime:(mt?mt.regime:null) }; };
   // exposure framing table -> confirms / opposes
   const confirms=[], opposes=[];
   const exp=Object.keys(secs).find(k=>/exposure framing/i.test(k));
@@ -525,15 +548,19 @@ function parseDecon(text){
 }
 
 function nodeCard(n){
+  const nameLine=n.name?'<span style="font-size:12.5px;font-weight:600;">'+esc(n.name)+'</span>':'';
+  const roleLine=n.role?'<div style="font-size:11px;line-height:1.4;color:var(--navy);opacity:.78;margin-top:5px;"><b>What it does:</b> '+esc(n.role)+'</div>':'';
   if(!n.mapped) return '<div style="border:1px dashed var(--line);background:rgba(20,38,63,0.02);padding:11px 12px;border-radius:2px;">'+
-    '<div style="display:flex;justify-content:space-between;gap:8px;"><span style="font-weight:600;font-size:13px;">'+esc(n.ticker)+'</span><span class="eyebrow" style="border:1px solid var(--line);padding:1px 5px;">No tape</span></div>'+
-    '<div style="font-size:11.5px;line-height:1.45;color:var(--slate);margin-top:8px;">'+esc(n.why)+'</div>'+
+    '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;"><span style="font-family:Geist Mono,monospace;font-weight:700;font-size:13px;">'+esc(n.ticker)+'</span><span class="eyebrow" style="border:1px solid var(--line);padding:1px 5px;">No tape</span></div>'+
+    (nameLine?'<div style="margin-top:6px;">'+nameLine+'</div>':'')+roleLine+
+    '<div style="font-size:11.5px;line-height:1.45;color:var(--slate);margin-top:7px;"><b>Why it matters:</b> '+esc(n.why)+'</div>'+
     '<button class="dnode" data-t="'+esc(n.ticker)+'" style="margin-top:10px;background:none;border:1px solid var(--line);color:var(--slate);cursor:pointer;font-size:11px;font-weight:600;padding:4px 11px;border-radius:2px;">Request map ▸</button></div>';
   const accent=n.kind==="oppose"?C.brick:C.sage, rsc=n.rsv>0?C.sage:n.rsv<0?C.brick:C.honey;
+  const sp=n.spark?spark(n.spark,66,19)+'&nbsp;':'';
   return '<div class="tk" data-t="'+esc(n.ticker)+'" style="border:1px solid var(--line);border-left:3px solid '+accent+';background:var(--paper);padding:11px 12px;border-radius:2px;cursor:pointer;">'+
-    '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-family:Geist Mono,monospace;font-weight:700;font-size:13px;border:1px solid var(--line);padding:1px 7px;border-radius:2px;">'+esc(n.ticker)+'</span><span class="mono" style="font-size:12px;font-weight:600;color:'+rsc+';">'+(n.rs!=null?n.rs:"")+'</span></div>'+
-    '<div style="display:flex;align-items:center;gap:9px;margin-top:9px;">'+spark(n.spark,66,19)+'<span style="font-size:12px;font-weight:600;">'+esc(n.name)+'</span></div>'+
-    '<div style="font-size:11.5px;line-height:1.45;color:var(--slate);margin-top:9px;">'+esc(n.why)+'</div>'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-family:Geist Mono,monospace;font-weight:700;font-size:13px;border:1px solid var(--line);padding:1px 7px;border-radius:2px;">'+esc(n.ticker)+'</span><span class="mono" style="font-size:12px;font-weight:600;color:'+rsc+';">'+(n.rs!=null?"RS "+n.rs:"")+'</span></div>'+
+    '<div style="display:flex;align-items:center;gap:9px;margin-top:9px;">'+sp+nameLine+'</div>'+roleLine+
+    '<div style="font-size:11.5px;line-height:1.45;color:var(--slate);margin-top:8px;"><b>Why it matters:</b> '+esc(n.why)+'</div>'+
     '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:11px;"><span class="mono" style="font-size:11px;font-weight:600;">'+esc(n.regime||"")+'</span><span style="color:var(--wine);font-size:11px;font-weight:600;">tap to read ▸</span></div></div>';
 }
 
