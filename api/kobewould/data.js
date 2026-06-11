@@ -18,7 +18,8 @@ async function fromBlob() {
 }
 
 async function fromGist() {
-  const url = env("KOBEWOULD_SNAP_URL");
+  // strip BOM/zero-width/whitespace — env values pasted via CLI can carry them
+  const url = env("KOBEWOULD_SNAP_URL").replace(/[\u{FEFF}\u{200B}\s]/gu, "");
   if (!url) throw new Error("no fallback snapshot url configured");
   const r = await fetch(url + (url.includes("?") ? "&" : "?") + "t=" + Math.floor(Date.now() / 60000),
     { cache: "no-store" });
