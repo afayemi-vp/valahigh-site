@@ -466,7 +466,7 @@ function deconRequestBox(){
 let deconRaw=false;
 function _splitSections(text){
   const secs={_intro:[]}; let cur="_intro";
-  text.split("\n").forEach(l=>{ const h=l.match(/^##\s+(.*)/); if(h){cur=h[1].trim();secs[cur]=[];} else secs[cur].push(l); });
+  text.split("\\n").forEach(l=>{ const h=l.match(/^##\\s+(.*)/); if(h){cur=h[1].trim();secs[cur]=[];} else secs[cur].push(l); });
   return secs;
 }
 function _parseTable(lines){
@@ -475,13 +475,13 @@ function _parseTable(lines){
   const cells=l=>l.split("|").slice(1,-1).map(c=>c.trim());
   return rows.slice(2).map(cells).filter(r=>r.length>1);  // skip header+separator
 }
-function _firstTicker(s){ const m=(s||"").match(/\b([A-Z]{2,5})\b/); return m?m[1]:null; }
+function _firstTicker(s){ const m=(s||"").match(/\\b([A-Z]{2,5})\\b/); return m?m[1]:null; }
 function _figs(text){
-  const out=[]; const re=/([+\-]?\$?\d[\d,]*(?:\.\d+)?\s*(?:%|x|B|M|bps)?)/g; let m;
+  const out=[]; const re=/([+\\-]?\\$?\\d[\\d,]*(?:\\.\\d+)?\\s*(?:%|x|B|M|bps)?)/g; let m;
   while((m=re.exec(text))&&out.length<2){ const v=m[1].trim(); if(v.length>1&&!out.includes(v)) out.push(v); }
   return out;
 }
-function _strip(s){ return (s||"").replace(/\*\*/g,"").replace(/[#\`]/g,"").trim(); }
+function _strip(s){ return (s||"").replace(/\\*\\*/g,"").replace(/[#\`]/g,"").trim(); }
 
 function parseDecon(text){
   const idx=tickerIndex(), secs=_splitSections(text);
@@ -509,16 +509,16 @@ function parseDecon(text){
   const dyn=[]; const tape=Object.keys(secs).find(k=>/tape read/i.test(k));
   if(tape) secs[tape].filter(l=>l.trim().startsWith("- ")).forEach(l=>{
     const t=_strip(l.replace(/^- /,"")); const low=t.toLowerCase();
-    const up=/lead|strong|outperform|leader|\+\d|above/.test(low)&&!/lag|weak|below|down/.test(low);
+    const up=/lead|strong|outperform|leader|\\+\\d|above/.test(low)&&!/lag|weak|below|down/.test(low);
     const dn=/lag|weak|down|underperform|laggard|below|dead/.test(low);
-    const head=(l.match(/\*\*(.+?)\*\*/)||[])[1]||t.split(".")[0];
+    const head=(l.match(/\\*\\*(.+?)\\*\\*/)||[])[1]||t.split(".")[0];
     dyn.push({label:_strip(head).slice(0,90), tail:t.slice(0,150),
       arrow:up?"▲":dn?"▼":"◆", color:up?C.sage:dn?C.brick:C.honey,
       tag:up?"tailwind":dn?"headwind":"watch"}); });
   // remaining narrative sections -> breakdown cards
   const skip=/frame|tape read|value chain|exposure framing|learn to read|aligned etfs/i;
   const cards=[]; Object.keys(secs).forEach(k=>{ if(k==="_intro"||skip.test(k)) return;
-    const body=_strip(secs[k].join("\n")); if(body.length<40) return;
+    const body=_strip(secs[k].join("\\n")); if(body.length<40) return;
     cards.push({label:k, figs:_figs(body), summary:body.slice(0,200), full:body.slice(200,900)}); });
   return {thesis, confirms, opposes, dyn, cards,
     leaders:confirms.filter(n=>n.rsv!=null).length, laggards:opposes.length};
