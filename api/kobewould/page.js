@@ -462,16 +462,133 @@ function deconRequestBox(){
     '<div id="deconmsg" class="mono" style="font-size:10.5px;color:var(--slate);margin-top:8px;">Queued requests are fulfilled on the next daily run (or when you run /keel-thesis). Drill into any deconstruction\\'s "drill-down candidates" by requesting that part here.</div></div>';
 }
 
+// ---- markdown memo -> structured deconstruction (Terminal v2 design) ----
+let deconRaw=false;
+function _splitSections(text){
+  const secs={_intro:[]}; let cur="_intro";
+  text.split("\n").forEach(l=>{ const h=l.match(/^##\s+(.*)/); if(h){cur=h[1].trim();secs[cur]=[];} else secs[cur].push(l); });
+  return secs;
+}
+function _parseTable(lines){
+  const rows=lines.filter(l=>l.trim().startsWith("|")&&l.includes("|"));
+  if(rows.length<2) return [];
+  const cells=l=>l.split("|").slice(1,-1).map(c=>c.trim());
+  return rows.slice(2).map(cells).filter(r=>r.length>1);  // skip header+separator
+}
+function _firstTicker(s){ const m=(s||"").match(/\b([A-Z]{2,5})\b/); return m?m[1]:null; }
+function _figs(text){
+  const out=[]; const re=/([+\-]?\$?\d[\d,]*(?:\.\d+)?\s*(?:%|x|B|M|bps)?)/g; let m;
+  while((m=re.exec(text))&&out.length<2){ const v=m[1].trim(); if(v.length>1&&!out.includes(v)) out.push(v); }
+  return out;
+}
+function _strip(s){ return (s||"").replace(/\*\*/g,"").replace(/[#\`]/g,"").trim(); }
+
+function parseDecon(text){
+  const idx=tickerIndex(), secs=_splitSections(text);
+  const thesis=_strip((secs["Frame"]||secs["_intro"]||[]).join(" ")).slice(0,520);
+  const node=(ticker,why,kind)=>{ const r=idx[ticker]; return {
+    ticker, name:r?(r.name||""):"", why:_strip(why).slice(0,150), kind,
+    mapped:!!r, rs:r&&r.rs_3m_pct!=null?fmt(r.rs_3m_pct,1):null, rsv:r?r.rs_3m_pct:null,
+    spark:r?r.spark:null, regime:r?r.regime:null }; };
+  // exposure framing table -> confirms / opposes
+  const confirms=[], opposes=[];
+  const exp=Object.keys(secs).find(k=>/exposure framing/i.test(k));
+  if(exp) _parseTable(secs[exp]).forEach(row=>{
+    const t=_firstTicker(row[0]), dir=(row[1]||"").toLowerCase(), why=row[2]||row[0];
+    if(!t) return;
+    if(/short|avoid|hedge|fade/.test(dir)) opposes.push(node(t,why,"oppose"));
+    else if(/long|buy|own|momentum|trend|revert/.test(dir)) confirms.push(node(t,why,"confirm"));
+  });
+  // fall back to value-chain competitors/customers if no exposure table
+  if(!confirms.length && !opposes.length){
+    Object.keys(secs).forEach(k=>{ if(/value chain|tickers/i.test(k)) _parseTable(secs[k]).forEach(row=>{
+      const t=_firstTicker(row[1]||row[0]); if(!t) return;
+      const n=node(t,row[2]||"",  n=>n); if(n.rsv!=null&&n.rsv>=0) confirms.push(n); else opposes.push(n); }); });
+  }
+  // tape-read bullets -> market dynamics
+  const dyn=[]; const tape=Object.keys(secs).find(k=>/tape read/i.test(k));
+  if(tape) secs[tape].filter(l=>l.trim().startsWith("- ")).forEach(l=>{
+    const t=_strip(l.replace(/^- /,"")); const low=t.toLowerCase();
+    const up=/lead|strong|outperform|leader|\+\d|above/.test(low)&&!/lag|weak|below|down/.test(low);
+    const dn=/lag|weak|down|underperform|laggard|below|dead/.test(low);
+    const head=(l.match(/\*\*(.+?)\*\*/)||[])[1]||t.split(".")[0];
+    dyn.push({label:_strip(head).slice(0,90), tail:t.slice(0,150),
+      arrow:up?"▲":dn?"▼":"◆", color:up?C.sage:dn?C.brick:C.honey,
+      tag:up?"tailwind":dn?"headwind":"watch"}); });
+  // remaining narrative sections -> breakdown cards
+  const skip=/frame|tape read|value chain|exposure framing|learn to read|aligned etfs/i;
+  const cards=[]; Object.keys(secs).forEach(k=>{ if(k==="_intro"||skip.test(k)) return;
+    const body=_strip(secs[k].join("\n")); if(body.length<40) return;
+    cards.push({label:k, figs:_figs(body), summary:body.slice(0,200), full:body.slice(200,900)}); });
+  return {thesis, confirms, opposes, dyn, cards,
+    leaders:confirms.filter(n=>n.rsv!=null).length, laggards:opposes.length};
+}
+
+function nodeCard(n){
+  if(!n.mapped) return '<div style="border:1px dashed var(--line);background:rgba(20,38,63,0.02);padding:11px 12px;border-radius:2px;">'+
+    '<div style="display:flex;justify-content:space-between;gap:8px;"><span style="font-weight:600;font-size:13px;">'+esc(n.ticker)+'</span><span class="eyebrow" style="border:1px solid var(--line);padding:1px 5px;">No tape</span></div>'+
+    '<div style="font-size:11.5px;line-height:1.45;color:var(--slate);margin-top:8px;">'+esc(n.why)+'</div>'+
+    '<button class="dnode" data-t="'+esc(n.ticker)+'" style="margin-top:10px;background:none;border:1px solid var(--line);color:var(--slate);cursor:pointer;font-size:11px;font-weight:600;padding:4px 11px;border-radius:2px;">Request map ▸</button></div>';
+  const accent=n.kind==="oppose"?C.brick:C.sage, rsc=n.rsv>0?C.sage:n.rsv<0?C.brick:C.honey;
+  return '<div class="tk" data-t="'+esc(n.ticker)+'" style="border:1px solid var(--line);border-left:3px solid '+accent+';background:var(--paper);padding:11px 12px;border-radius:2px;cursor:pointer;">'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-family:Geist Mono,monospace;font-weight:700;font-size:13px;border:1px solid var(--line);padding:1px 7px;border-radius:2px;">'+esc(n.ticker)+'</span><span class="mono" style="font-size:12px;font-weight:600;color:'+rsc+';">'+(n.rs!=null?n.rs:"")+'</span></div>'+
+    '<div style="display:flex;align-items:center;gap:9px;margin-top:9px;">'+spark(n.spark,66,19)+'<span style="font-size:12px;font-weight:600;">'+esc(n.name)+'</span></div>'+
+    '<div style="font-size:11.5px;line-height:1.45;color:var(--slate);margin-top:9px;">'+esc(n.why)+'</div>'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:11px;"><span class="mono" style="font-size:11px;font-weight:600;">'+esc(n.regime||"")+'</span><span style="color:var(--wine);font-size:11px;font-weight:600;">tap to read ▸</span></div></div>';
+}
+
+function lane(title,color,nodes){
+  let h='<div style="display:flex;align-items:center;gap:9px;margin-bottom:14px;"><span style="width:9px;height:9px;background:'+color+';"></span>'+
+    '<span style="font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:'+color+';">'+title+'</span>'+
+    '<span style="flex:1;height:1px;background:'+color+';opacity:.3;"></span><span class="mono" style="font-size:12px;font-weight:600;color:var(--slate);">'+nodes.length+'</span></div>';
+  h+='<div style="display:flex;flex-direction:column;gap:10px;">'+(nodes.length?nodes.map(nodeCard).join(""):'<div class="dim" style="font-size:12px;">—</div>')+'</div>';
+  return h;
+}
+
 function renderDecon(){
   const list=SNAP.deconstructions||[];
   if(!list.length) return '<div class="sect-h" style="margin-bottom:6px;">Thesis deconstruction</div>'+deconRequestBox()+
-    '<div class="dim">No deconstructions yet — queue one above (or run /keel-thesis locally). Each breaks a business into segments, value creation, shareholder value, growth, fundamentals, the public value chain, live tape, and exposure ideas.</div>';
+    '<div class="dim">No deconstructions yet — queue one above (or run /keel-thesis locally). Each maps a business into confirming &amp; opposing public names with live tape, plus a business breakdown.</div>';
   if(!deconSlug || !list.find(d=>d.slug===deconSlug)) deconSlug=list[0].slug;
   const sel=list.find(d=>d.slug===deconSlug);
   let picker='<div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:16px;">';
   list.forEach(d=>{ picker+='<button data-slug="'+esc(d.slug)+'" class="deconpick" style="background:'+(d.slug===deconSlug?'var(--navy)':'transparent')+';color:'+(d.slug===deconSlug?'var(--paper)':'var(--slate)')+';border:1px solid var(--line);border-radius:3px;padding:5px 12px;cursor:pointer;font-family:Geist Mono,monospace;font-size:11.5px;">'+esc(d.title)+'</button>'; });
   picker+='</div>';
-  return '<div class="sect-h" style="margin-bottom:12px;">Thesis deconstruction · learning tool, not advice</div>'+deconRequestBox()+picker+md(sel.md);
+  const head='<div class="sect-h" style="margin-bottom:12px;">Thesis deconstruction · learning tool, not advice</div>'+deconRequestBox()+picker;
+  if(deconRaw) return head+'<button id="dxmode" style="margin-bottom:12px;background:none;border:1px solid var(--line);border-radius:3px;padding:5px 12px;cursor:pointer;font-size:11px;color:var(--wine);">◳ Field view</button>'+md(sel.md);
+  let p; try{ p=parseDecon(sel.md); }catch(e){ return head+md(sel.md); }
+  if(!p.thesis || (!p.confirms.length && !p.opposes.length)) return head+md(sel.md);
+  // subject hero (model-written)
+  let html=head+'<div style="border-left:5px solid var(--navy);padding:2px 0 2px 16px;margin-bottom:20px;">'+
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;">'+
+    '<div><span class="eyebrow" style="background:var(--navy);color:var(--paper);padding:2px 7px;">Model-written thesis</span>'+
+    '<div style="font-family:Big Shoulders Display,sans-serif;font-weight:800;font-size:26px;margin-top:10px;">'+esc(sel.title)+'</div></div>'+
+    '<button id="dxmode" style="background:none;border:1px solid var(--line);border-radius:3px;padding:5px 12px;cursor:pointer;font-size:11px;color:var(--wine);">≡ Full memo</button></div>'+
+    '<div style="font-size:15px;line-height:1.5;margin-top:10px;max-width:640px;">'+esc(p.thesis)+'</div>'+
+    '<div style="display:flex;gap:22px;margin-top:14px;flex-wrap:wrap;">'+
+    '<div><div class="eyebrow">Mapped names</div><div class="mono" style="font-weight:600;font-size:16px;">'+(p.confirms.length+p.opposes.length)+'</div></div>'+
+    '<div><div class="eyebrow">Confirming</div><div class="mono" style="font-weight:600;font-size:16px;color:'+C.sage+';">'+p.confirms.length+'</div></div>'+
+    '<div><div class="eyebrow">Opposing</div><div class="mono" style="font-weight:600;font-size:16px;color:'+C.brick+';">'+p.opposes.length+'</div></div></div></div>';
+  // the field: confirms | dynamics | opposes
+  html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:22px;margin-bottom:30px;">'+
+    '<div>'+lane("Confirms the thesis",C.sage,p.confirms)+'</div>'+
+    '<div><div style="display:flex;align-items:center;gap:9px;margin-bottom:14px;"><span style="width:9px;height:9px;background:'+C.honey+';"></span><span style="font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:'+C.honey+';">Market dynamics</span><span style="flex:1;height:1px;background:'+C.honey+';opacity:.3;"></span></div>'+
+    (p.dyn.length?p.dyn.map(d=>'<div style="display:flex;gap:11px;padding:12px 0;border-bottom:1px solid var(--hair);"><span class="mono" style="font-size:19px;font-weight:700;color:'+d.color+';width:16px;text-align:center;">'+d.arrow+'</span><div style="flex:1;"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><span style="font-size:12.5px;font-weight:600;">'+esc(d.label)+'</span><span class="eyebrow" style="color:'+d.color+';border:1px solid '+d.color+';padding:1px 5px;">'+d.tag+'</span></div><div style="font-size:11px;color:var(--slate);margin-top:4px;">'+esc(d.tail)+'</div></div></div>').join(""):'<div class="dim" style="font-size:12px;">—</div>')+'</div>'+
+    '<div>'+lane("Opposes / counter-forces",C.brick,p.opposes)+'</div></div>';
+  // business breakdown cards
+  if(p.cards.length){
+    html+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;"><span style="font-size:11px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;">Business Breakdown</span><span style="flex:1;height:1px;background:var(--line);"></span></div>';
+    html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);">';
+    p.cards.forEach((c,i)=>{
+      html+='<div style="background:var(--paper);padding:14px 15px;">'+
+        '<div class="eyebrow" style="color:var(--wine);margin-bottom:10px;">'+esc(c.label)+'</div>'+
+        (c.figs.length?'<div style="display:flex;gap:16px;margin-bottom:10px;">'+c.figs.map(f=>'<div class="mono" style="font-weight:700;font-size:21px;color:'+(String(f).indexOf("-")===0?C.brick:C.navy)+';">'+esc(f)+'</div>').join("")+'</div>':'')+
+        '<div style="font-size:12px;line-height:1.5;color:var(--slate);">'+esc(c.summary)+(c.full?'…':'')+'</div>'+
+        (c.full?'<div class="dxfull" data-i="'+i+'" style="display:none;font-size:12px;line-height:1.55;color:var(--slate);margin-top:9px;padding-top:9px;border-top:1px solid var(--hair);">'+esc(c.full)+'</div><button class="dxmore" data-i="'+i+'" style="margin-top:10px;background:none;border:none;cursor:pointer;font-size:11px;font-weight:600;color:var(--wine);padding:0;">Read full ▸</button>':'')+'</div>';
+    });
+    html+='</div>';
+  }
+  return html;
 }
 
 function renderGlossary(){
@@ -627,6 +744,10 @@ function render(){
       catch(e){ if(msg)msg.textContent="error: "+e.message; } finally{ sub.disabled=false; } };
       sub.onclick=go; inp.onkeydown=(e)=>{ if(e.key==="Enter") go(); };
     }
+    const dm=$("dxmode"); if(dm) dm.onclick=()=>{ deconRaw=!deconRaw; render(); };
+    document.querySelectorAll(".dxmore").forEach(b=>b.onclick=()=>{ const f=document.querySelector('.dxfull[data-i="'+b.dataset.i+'"]'); if(f){ const open=f.style.display!=="none"; f.style.display=open?"none":"block"; b.textContent=open?"Read full ▸":"Read less ▴"; } });
+    document.querySelectorAll(".dnode").forEach(b=>b.onclick=async(e)=>{ e.stopPropagation(); b.disabled=true; const t=b.dataset.t; b.textContent="queuing…";
+      try{ await fetch("/api/kobewould/request",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({subject:t})}); b.textContent="map queued ✓"; }catch(err){ b.textContent="error"; } });
   }
   if(view==="panels"){ document.querySelectorAll(".panelpick").forEach(b=>b.onclick=()=>{panelSlug=b.dataset.slug;render();}); }
   if(view==="markets"){ document.querySelectorAll(".mgpick").forEach(b=>b.onclick=()=>{marketGroup=b.dataset.mg;render();}); }
