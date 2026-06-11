@@ -344,6 +344,7 @@ function stat(label, big, bigColor, sub){
 
 function renderStatline(){
   const b=SNAP.book||{}, r=SNAP.risk||{};
+  const eq=b.equity, hwm=r.high_water_mark;
   const ven = SNAP.venues || {};
   const kr = ven.kraken || null;
   const krUsd = kr ? Object.entries(kr).map(([a,v])=>fmt(v)+" "+esc(a)).join(", ") : null;
