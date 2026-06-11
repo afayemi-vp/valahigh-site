@@ -344,8 +344,6 @@ function stat(label, big, bigColor, sub){
 
 function renderStatline(){
   const b=SNAP.book||{}, r=SNAP.risk||{};
-  const eq=b.equity, hwm=r.high_water_mark;
-  const inceptionPct = (eq&&hwm) ? null : null;
   const ven = SNAP.venues || {};
   const kr = ven.kraken || null;
   const krUsd = kr ? Object.entries(kr).map(([a,v])=>fmt(v)+" "+esc(a)).join(", ") : null;
@@ -784,6 +782,8 @@ function renderReports(){
 
 function render(){
   if(!SNAP) return;
+  const gt=$("gxtip"); if(gt) gt.style.display="none";   // close tip sheet on any re-render
+  closeTk();                                              // and any open ticker modal
   $("nav").innerHTML=orderedViews().map(([k,l])=>'<button data-v="'+k+'" class="'+(view===k?"on":"")+'">'+l+'</button>').join("")
     +'<button data-v="layout" class="'+(view==="layout"?"on":"")+'" title="customize layout" style="margin-left:auto;">⚙</button>';
   document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{view=b.dataset.v;location.hash=view;render();});

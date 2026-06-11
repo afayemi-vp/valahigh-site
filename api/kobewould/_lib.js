@@ -10,13 +10,27 @@ export function env(name) {
 }
 
 export function timingSafeEqualStr(a, b) {
-  const ab = Buffer.from(String(a));
-  const bb = Buffer.from(String(b));
-  if (ab.length !== bb.length) {
-    crypto.timingSafeEqual(ab, ab); // keep timing flat-ish
-    return false;
-  }
-  return crypto.timingSafeEqual(ab, bb);
+  // hash both sides to a fixed length first so neither content nor LENGTH
+  // differences are observable through timing
+  const ah = crypto.createHash("sha256").update(String(a)).digest();
+  const bh = crypto.createHash("sha256").update(String(b)).digest();
+  return crypto.timingSafeEqual(ah, bh);
+}
+
+// ── per-IP login throttle (module scope: per warm serverless instance).
+// Escalating delay, soft 429 after a burst; never a global/owner lockout. ──
+const _fails = new Map(); // ip -> {n, ts}
+export function loginThrottle(req) {
+  const ip = String(req.headers["x-forwarded-for"] || "?").split(",")[0].trim();
+  const now = Date.now();
+  const rec = _fails.get(ip) || { n: 0, ts: now };
+  if (now - rec.ts > 15 * 60 * 1000) { rec.n = 0; rec.ts = now; } // 15-min window
+  return {
+    blocked: rec.n >= 20,
+    delayMs: Math.min(700 * Math.pow(2, Math.max(0, rec.n - 2)), 8000),
+    fail() { rec.n += 1; rec.ts = now; _fails.set(ip, rec); },
+    ok() { _fails.delete(ip); },
+  };
 }
 
 // ── request body (don't rely on Vercel auto-parsing; read the raw stream) ──

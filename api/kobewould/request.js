@@ -62,6 +62,10 @@ export default async function handler(req, res) {
     if (isAuthed(req, env("KOBEWOULD_SECRET"))) {
       const subject = String(body.subject || "").trim().slice(0, 80);
       if (!subject) { res.status(400).json({ error: "empty subject" }); return; }
+      if ((q.pending || []).length >= 10) {
+        res.status(429).json({ error: "queue full (10 pending) — wait for the daily run to clear some" });
+        return;
+      }
       const key = subject.toLowerCase();
       if (!q.pending.some((p) => p.subject === key)) {
         q.pending.push({ subject: key, label: subject, ts: new Date().toISOString() });
