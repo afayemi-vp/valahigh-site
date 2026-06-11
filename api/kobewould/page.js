@@ -302,7 +302,7 @@ function spark(values, w, h){
 let SNAP=null, view=location.hash.slice(1)||"mission", reportTab="brief";
 const VIEWS=[["mission","Mission"],["markets","Markets"],["rebalance","Rebalance"],["decon","Deconstruct"],["panels","Panels"],["theses","Theses"],["m7a","M7A"],["smb","SMB"],
              ["opps","Opportunities"],["reads","Reads"],["reports","Reports"],["glossary","Glossary"]];
-let deconSlug=null, panelSlug=null, marketGroup="strongest", rebalAmount=null, layoutOpen=false;
+let deconSlug=null, panelSlug=null, marketGroup="strongest", rebalAmount=null, layoutOpen=false, panelRaw=false;
 function loadLayout(){ try{ return JSON.parse(localStorage.getItem("kobe_layout")||"{}"); }catch(e){ return {}; } }
 function saveLayout(l){ try{ localStorage.setItem("kobe_layout", JSON.stringify(l)); }catch(e){} }
 function orderedViews(){
@@ -569,6 +569,12 @@ function parseDecon(text){
       const t=_firstTicker(row[1]||row[0]); if(!t) return;
       const n=node(t,row[2]||"",  n=>n); if(n.rsv!=null&&n.rsv>=0) confirms.push(n); else opposes.push(n); }); });
   }
+  // dedupe: a ticker appears once; confirm wins over a tactical fade/hedge
+  const seen=new Set();
+  const dedup=arr=>arr.filter(n=>{ if(seen.has(n.ticker)) return false; seen.add(n.ticker); return true; });
+  const confirmsU=dedup(confirms), opposesU=dedup(opposes);
+  confirms.length=0; confirms.push(...confirmsU);
+  opposes.length=0; opposes.push(...opposesU);
   // tape-read bullets -> market dynamics
   const dyn=[]; const tape=Object.keys(secs).find(k=>/tape read/i.test(k));
   if(tape) secs[tape].filter(l=>l.trim().startsWith("- ")).forEach(l=>{
@@ -623,37 +629,25 @@ function renderDecon(){
   list.forEach(d=>{ picker+='<button data-slug="'+esc(d.slug)+'" class="deconpick" style="background:'+(d.slug===deconSlug?'var(--navy)':'transparent')+';color:'+(d.slug===deconSlug?'var(--paper)':'var(--slate)')+';border:1px solid var(--line);border-radius:3px;padding:5px 12px;cursor:pointer;font-family:Geist Mono,monospace;font-size:11.5px;">'+esc(d.title)+'</button>'; });
   picker+='</div>';
   const head='<div class="sect-h" style="margin-bottom:12px;">Thesis deconstruction · learning tool, not advice</div>'+deconRequestBox()+picker;
-  if(deconRaw) return head+'<button id="dxmode" style="margin-bottom:12px;background:none;border:1px solid var(--line);border-radius:3px;padding:5px 12px;cursor:pointer;font-size:11px;color:var(--wine);">◳ Field view</button>'+md(sel.md);
+  const toggle='<button id="dxmode" style="margin-bottom:12px;background:none;border:1px solid var(--line);border-radius:3px;padding:5px 12px;cursor:pointer;font-size:11px;color:var(--wine);">'+(deconRaw?'◳ Field view':'≡ Full memo')+'</button>';
+  if(deconRaw) return head+toggle+md(sel.md);
   let p; try{ p=parseDecon(sel.md); }catch(e){ return head+md(sel.md); }
-  if(!p.thesis || (!p.confirms.length && !p.opposes.length)) return head+md(sel.md);
-  // subject hero (model-written)
-  let html=head+'<div style="border-left:5px solid var(--navy);padding:2px 0 2px 16px;margin-bottom:20px;">'+
-    '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;">'+
-    '<div><span class="eyebrow" style="background:var(--navy);color:var(--paper);padding:2px 7px;">Model-written thesis</span>'+
-    '<div style="font-family:Big Shoulders Display,sans-serif;font-weight:800;font-size:26px;margin-top:10px;">'+esc(sel.title)+'</div></div>'+
-    '<button id="dxmode" style="background:none;border:1px solid var(--line);border-radius:3px;padding:5px 12px;cursor:pointer;font-size:11px;color:var(--wine);">≡ Full memo</button></div>'+
-    '<div style="font-size:15px;line-height:1.5;margin-top:10px;max-width:640px;">'+gx(p.thesis)+'</div>'+
-    '<div style="display:flex;gap:22px;margin-top:14px;flex-wrap:wrap;">'+
-    '<div><div class="eyebrow">Mapped names</div><div class="mono" style="font-weight:600;font-size:16px;">'+(p.confirms.length+p.opposes.length)+'</div></div>'+
-    '<div><div class="eyebrow">Confirming</div><div class="mono" style="font-weight:600;font-size:16px;color:'+C.sage+';">'+p.confirms.length+'</div></div>'+
-    '<div><div class="eyebrow">Opposing</div><div class="mono" style="font-weight:600;font-size:16px;color:'+C.brick+';">'+p.opposes.length+'</div></div></div></div>';
-  // the field: confirms | dynamics | opposes
-  html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:22px;margin-bottom:30px;">'+
-    '<div>'+lane("Confirms the thesis",C.sage,p.confirms)+'</div>'+
-    '<div><div style="display:flex;align-items:center;gap:9px;margin-bottom:14px;"><span style="width:9px;height:9px;background:'+C.honey+';"></span><span style="font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:'+C.honey+';">Market dynamics</span><span style="flex:1;height:1px;background:'+C.honey+';opacity:.3;"></span></div>'+
-    (p.dyn.length?p.dyn.map(d=>'<div style="display:flex;gap:11px;padding:12px 0;border-bottom:1px solid var(--hair);"><span class="mono" style="font-size:19px;font-weight:700;color:'+d.color+';width:16px;text-align:center;">'+d.arrow+'</span><div style="flex:1;"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><span style="font-size:12.5px;font-weight:600;">'+gx(d.label)+'</span><span class="eyebrow" style="color:'+d.color+';border:1px solid '+d.color+';padding:1px 5px;">'+d.tag+'</span></div><div style="font-size:11px;color:var(--slate);margin-top:4px;">'+gx(d.tail)+'</div></div></div>').join(""):'<div class="dim" style="font-size:12px;">—</div>')+'</div>'+
-    '<div>'+lane("Opposes / counter-forces",C.brick,p.opposes)+'</div></div>';
-  // business breakdown cards
+  if(!p.thesis && !p.confirms.length && !p.opposes.length && !p.cards.length) return head+md(sel.md);
+  return head+toggle+richMemo(p, sel.title);
+}
+
+function richMemo(p, title){
+  let html='';
+  if(p.thesis){
+    const counts=(p.confirms.length||p.opposes.length)?'<div style="display:flex;gap:22px;margin-top:14px;flex-wrap:wrap;"><div><div class="eyebrow">Mapped names</div><div class="mono" style="font-weight:600;font-size:16px;">'+(p.confirms.length+p.opposes.length)+'</div></div><div><div class="eyebrow">Confirming</div><div class="mono" style="font-weight:600;font-size:16px;color:'+C.sage+';">'+p.confirms.length+'</div></div><div><div class="eyebrow">Opposing</div><div class="mono" style="font-weight:600;font-size:16px;color:'+C.brick+';">'+p.opposes.length+'</div></div></div>':'';
+    html+='<div style="border-left:5px solid var(--navy);padding:2px 0 2px 16px;margin-bottom:20px;"><span class="eyebrow" style="background:var(--navy);color:var(--paper);padding:2px 7px;">Model-written</span><div style="font-family:Big Shoulders Display,sans-serif;font-weight:800;font-size:26px;margin-top:10px;">'+esc(title)+'</div><div style="font-size:15px;line-height:1.5;margin-top:10px;max-width:640px;">'+gx(p.thesis)+'</div>'+counts+'</div>';
+  }
+  if(p.confirms.length||p.opposes.length){
+    html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:22px;margin-bottom:30px;"><div>'+lane("Confirms the thesis",C.sage,p.confirms)+'</div><div><div style="display:flex;align-items:center;gap:9px;margin-bottom:14px;"><span style="width:9px;height:9px;background:'+C.honey+';"></span><span style="font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:'+C.honey+';">Market dynamics</span><span style="flex:1;height:1px;background:'+C.honey+';opacity:.3;"></span></div>'+(p.dyn.length?p.dyn.map(d=>'<div style="display:flex;gap:11px;padding:12px 0;border-bottom:1px solid var(--hair);"><span class="mono" style="font-size:19px;font-weight:700;color:'+d.color+';width:16px;text-align:center;">'+d.arrow+'</span><div style="flex:1;"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><span style="font-size:12.5px;font-weight:600;">'+gx(d.label)+'</span><span class="eyebrow" style="color:'+d.color+';border:1px solid '+d.color+';padding:1px 5px;">'+d.tag+'</span></div><div style="font-size:11px;color:var(--slate);margin-top:4px;">'+gx(d.tail)+'</div></div></div>').join(""):'<div class="dim" style="font-size:12px;">—</div>')+'</div><div>'+lane("Opposes / counter-forces",C.brick,p.opposes)+'</div></div>';
+  }
   if(p.cards.length){
-    html+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;"><span style="font-size:11px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;">Business Breakdown</span><span style="flex:1;height:1px;background:var(--line);"></span></div>';
-    html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);">';
-    p.cards.forEach((c,i)=>{
-      html+='<div style="background:var(--paper);padding:14px 15px;">'+
-        '<div class="eyebrow" style="color:var(--wine);margin-bottom:10px;">'+esc(c.label)+'</div>'+
-        (c.figs.length?'<div style="display:flex;gap:16px;margin-bottom:10px;">'+c.figs.map(f=>'<div class="mono" style="font-weight:700;font-size:21px;color:'+(String(f).indexOf("-")===0?C.brick:C.navy)+';">'+esc(f)+'</div>').join("")+'</div>':'')+
-        '<div style="font-size:12px;line-height:1.5;color:var(--slate);">'+gx(c.summary)+(c.full?'…':'')+'</div>'+
-        (c.full?'<div class="dxfull" data-i="'+i+'" style="display:none;font-size:12px;line-height:1.55;color:var(--slate);margin-top:9px;padding-top:9px;border-top:1px solid var(--hair);">'+gx(c.full)+'</div><button class="dxmore" data-i="'+i+'" style="margin-top:10px;background:none;border:none;cursor:pointer;font-size:11px;font-weight:600;color:var(--wine);padding:0;">Read full ▸</button>':'')+'</div>';
-    });
+    html+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;"><span style="font-size:11px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;">Breakdown</span><span style="flex:1;height:1px;background:var(--line);"></span></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);">';
+    p.cards.forEach((c,i)=>{ html+='<div style="background:var(--paper);padding:14px 15px;"><div class="eyebrow" style="color:var(--wine);margin-bottom:10px;">'+esc(c.label)+'</div>'+(c.figs.length?'<div style="display:flex;gap:16px;margin-bottom:10px;">'+c.figs.map(f=>'<div class="mono" style="font-weight:700;font-size:21px;color:'+(String(f).indexOf("-")===0?C.brick:C.navy)+';">'+esc(f)+'</div>').join("")+'</div>':'')+'<div style="font-size:12px;line-height:1.5;color:var(--slate);">'+gx(c.summary)+(c.full?'…':'')+'</div>'+(c.full?'<div class="dxfull" data-i="'+i+'" style="display:none;font-size:12px;line-height:1.55;color:var(--slate);margin-top:9px;padding-top:9px;border-top:1px solid var(--hair);">'+gx(c.full)+'</div><button class="dxmore" data-i="'+i+'" style="margin-top:10px;background:none;border:none;cursor:pointer;font-size:11px;font-weight:600;color:var(--wine);padding:0;">Read full ▸</button>':'')+'</div>'; });
     html+='</div>';
   }
   return html;
@@ -691,7 +685,12 @@ function renderPanels(){
   let picker='<div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:16px;">';
   list.forEach(d=>{ picker+='<button data-slug="'+esc(d.slug)+'" class="panelpick" style="background:'+(d.slug===panelSlug?'var(--navy)':'transparent')+';color:'+(d.slug===panelSlug?'var(--paper)':'var(--slate)')+';border:1px solid var(--line);border-radius:3px;padding:5px 12px;cursor:pointer;font-family:Geist Mono,monospace;font-size:11.5px;">'+esc(d.title)+'</button>'; });
   picker+='</div>';
-  return '<div class="sect-h" style="margin-bottom:12px;">Research panels · benchmarking &amp; context</div>'+picker+md(sel.md);
+  const head='<div class="sect-h" style="margin-bottom:12px;">Research panels · benchmarking &amp; context</div>'+picker;
+  const toggle='<button id="panelmode" style="margin-bottom:12px;background:none;border:1px solid var(--line);border-radius:3px;padding:5px 12px;cursor:pointer;font-size:11px;color:var(--wine);">'+(panelRaw?'◳ Structured view':'≡ Full memo')+'</button>';
+  if(panelRaw) return head+toggle+md(sel.md);
+  let p; try{ p=parseDecon(sel.md); }catch(e){ return head+md(sel.md); }
+  if(!p.thesis && !p.confirms.length && !p.cards.length) return head+md(sel.md);
+  return head+toggle+richMemo(p, sel.title);
 }
 
 function rsBar(rs){
@@ -817,7 +816,13 @@ function render(){
     document.querySelectorAll(".dnode").forEach(b=>b.onclick=async(e)=>{ e.stopPropagation(); b.disabled=true; const t=b.dataset.t; b.textContent="queuing…";
       try{ await fetch("/api/kobewould/request",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({subject:t})}); b.textContent="map queued ✓"; }catch(err){ b.textContent="error"; } });
   }
-  if(view==="panels"){ document.querySelectorAll(".panelpick").forEach(b=>b.onclick=()=>{panelSlug=b.dataset.slug;render();}); }
+  if(view==="panels"){
+    document.querySelectorAll(".panelpick").forEach(b=>b.onclick=()=>{panelSlug=b.dataset.slug;render();});
+    const pm=$("panelmode"); if(pm) pm.onclick=()=>{ panelRaw=!panelRaw; render(); };
+    document.querySelectorAll(".dxmore").forEach(b=>b.onclick=()=>{ const f=document.querySelector('.dxfull[data-i="'+b.dataset.i+'"]'); if(f){ const open=f.style.display!=="none"; f.style.display=open?"none":"block"; b.textContent=open?"Read full ▸":"Read less ▴"; } });
+    document.querySelectorAll(".dnode").forEach(b=>b.onclick=async(e)=>{ e.stopPropagation(); b.disabled=true; const t=b.dataset.t; b.textContent="queuing…";
+      try{ await fetch("/api/kobewould/request",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({subject:t})}); b.textContent="map queued ✓"; }catch(err){ b.textContent="error"; } });
+  }
   if(view==="markets"){ document.querySelectorAll(".mgpick").forEach(b=>b.onclick=()=>{marketGroup=b.dataset.mg;render();}); }
   if(view==="glossary"){ const gq=$("glossq"); if(gq){ gq.oninput=()=>{ glossQ=gq.value; const pos=gq.selectionStart; render(); const n=$("glossq"); if(n){ n.focus(); try{n.setSelectionRange(pos,pos);}catch(e){} } }; } }
   if(view==="rebalance"){ const inp=$("rebamt"); if(inp) inp.oninput=()=>{ rebalAmount=Math.max(0,Number(inp.value)||0); const v=$("view"); const pos=inp.selectionStart; render(); const n=$("rebamt"); if(n){ n.focus(); try{n.setSelectionRange(pos,pos);}catch(e){} } }; }
