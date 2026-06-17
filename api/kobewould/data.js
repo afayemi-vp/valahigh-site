@@ -6,7 +6,16 @@ import { list } from "@vercel/blob";
 import { blobAvailable, blobPrefix, configured, env, isAuthed } from "./_lib.js";
 
 const CACHE_MS = 60 * 1000;
+// keel publishes every 5 min; a snapshot older than this means that store has
+// stopped receiving writes (e.g. a suspended Vercel Blob). A present-but-stale
+// blob must NOT beat a fresh gist — that was the "snapshot 965 min old" bug.
+const STALE_MS = 20 * 60 * 1000;
 let _cache = { at: 0, body: null, source: "" };
+
+function snapAgeMs(snap) {
+  const ga = Date.parse(snap && snap.generated_at);
+  return Number.isFinite(ga) ? Date.now() - ga : Infinity;
+}
 
 async function fromBlob() {
   const { blobs } = await list({ prefix: blobPrefix(env("KEEL_PUBLISH_TOKEN")) });
@@ -39,19 +48,31 @@ export default async function handler(req, res) {
     res.status(200).json(_cache.body);
     return;
   }
-  let snapshot = null, source = "";
+  // Serve the FRESHEST of {blob, gist}, never a stale store. Only fetch the
+  // gist when the blob is missing or stale, so a healthy blob stays a single op.
+  let blobSnap = null, gistSnap = null;
   if (blobAvailable()) {
-    try { snapshot = await fromBlob(); source = "blob"; } catch { /* fall through */ }
+    try { blobSnap = await fromBlob(); } catch { /* fall through to gist */ }
   }
+  if (!blobSnap || snapAgeMs(blobSnap) > STALE_MS) {
+    try { gistSnap = await fromGist(); } catch { /* gist unavailable */ }
+  }
+
+  let snapshot = null, source = "";
+  const bAge = blobSnap ? snapAgeMs(blobSnap) : Infinity;
+  const gAge = gistSnap ? snapAgeMs(gistSnap) : Infinity;
+  if (gAge < bAge) { snapshot = gistSnap; source = "gist"; }
+  else if (blobSnap) { snapshot = blobSnap; source = "blob"; }
+  else if (gistSnap) { snapshot = gistSnap; source = "gist"; }
+
   if (!snapshot) {
-    try { snapshot = await fromGist(); source = "gist"; } catch (e) {
-      if (_cache.body) { res.status(200).json(_cache.body); return; }   // stale beats dead
-      res.status(503).json({ error: `snapshot unavailable: ${e.message}` });
-      return;
-    }
+    if (_cache.body) { res.status(200).json(_cache.body); return; }   // stale beats dead
+    res.status(503).json({ error: "snapshot unavailable from blob or gist" });
+    return;
   }
-  // tell the page when the write-store is down so it can flag paused controls
-  snapshot.storage = source === "blob" ? "ok" : "degraded";
+  // Flag controls as paused unless we're serving a FRESH blob (the write store).
+  // Gist-served or stale data => degraded, so the page disables write actions.
+  snapshot.storage = (source === "blob" && snapAgeMs(snapshot) <= STALE_MS) ? "ok" : "degraded";
   _cache = { at: now, body: snapshot, source };
   res.status(200).json(snapshot);
 }
