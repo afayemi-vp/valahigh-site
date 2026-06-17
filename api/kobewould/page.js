@@ -183,6 +183,49 @@ const APP = SHELL(`<div class="wrap">
 const $ = id => document.getElementById(id);
 const fmt = (x, d=2) => (x==null||x===""||isNaN(x)) ? "—" : Number(x).toFixed(d);
 const esc = s => String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+// human-readable labels for enums/IDs the server sends as snake_case
+const LABELS = {
+  paper_executable_now:"Paper-executable now", live_blocked_but_paper_valid:"Live-blocked, paper-valid",
+  risk_blocked:"Risk-blocked", portfolio_blocked:"Portfolio-blocked",
+  market_hours_blocked:"Market hours blocked", execution_blocked:"Execution-blocked",
+  watch_only:"Watch only", rejected:"Rejected",
+  promotion_candidate:"Promotion candidate", paper_candidate:"Paper candidate",
+  quality_rejected:"Quality rejected", cost_rejected:"Cost rejected",
+  no_signal:"No signal", filtered_research:"Filtered (research)",
+  momentum_breakout:"Momentum breakout", mean_reversion:"Mean reversion", trend_following:"Trend following",
+  trending_up:"Trending up", trending_down:"Trending down", ranging:"Ranging",
+  squeeze:"Squeeze", volatile_chop:"Volatile chop", mixed:"Mixed",
+  stop:"Stop", trail:"Trail", target:"Target", signal:"Signal exit", time:"Time stop", manual:"Manual",
+  hold:"Hold", tighten:"Tighten", reduce:"Reduce", exit:"Exit",
+  long:"Long", short:"Short",
+  draft:"Draft", operator_review:"Operator review", active_shadow:"Active shadow",
+  active_evidence_collection:"Active evidence", promoted_to_adr:"Promoted to ADR", retired:"Retired",
+  insufficient_sample:"Insufficient sample", contradictory:"Contradictory",
+  weak_support:"Weak support", moderate_support:"Moderate support",
+  strong_support:"Strong support", falsified:"Falsified",
+  continue_collecting:"Continue collecting", reject:"Reject", retire:"Retire",
+  promote_to_weekly_review:"Promote to Weekly Review", promote_to_adr_candidate:"Promote to ADR candidate",
+  balanced:"Balanced", aggressive:"Aggressive", conservative:"Conservative",
+  paper:"Paper", live:"Live",
+};
+// "xlk_1h" -> "XLK 1h" ; "btc/usd_1h" -> "BTC/USD 1h"
+const prettyInstrument = s => {
+  const m = String(s||"").match(/^(.+)_(15m|1h|4h|1d)$/i);
+  return m ? m[1].toUpperCase() + " " + m[2].toLowerCase() : s;
+};
+// label lookup -> instrument id -> snake_case to Sentence case
+const pretty = s => {
+  if (s == null || s === "") return "—";
+  const str = String(s).trim();
+  const low = str.toLowerCase();
+  if (LABELS[low]) return LABELS[low];
+  if (/^[a-z0-9/]+_(15m|1h|4h|1d)$/i.test(str)) return prettyInstrument(str);
+  if (str.includes("_") && !str.includes(" ")) {
+    const w = str.split("_").join(" ");
+    return w.charAt(0).toUpperCase() + w.slice(1);
+  }
+  return str;
+};
 const C = { navy:"#14263f", wine:"#8a2742", sage:"#5f7a4d", honey:"#b07d2a",
             brick:"#9c3a2b", assist:"#1f3a5f", mute:"#9a8f7a", slate:"#7a8694" };
 const GLOSSARY = ${GLOSS_JSON};
@@ -275,7 +318,7 @@ function showTk(ticker){
       '<div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-family:Big Shoulders Display,sans-serif;font-weight:800;font-size:26px;">'+esc(ticker)+'</div><button id="tkx" style="background:transparent;border:1px solid var(--line);border-radius:3px;padding:5px 10px;cursor:pointer;">✕</button></div>'+
       '<div class="dim" style="margin-bottom:8px;">'+esc(r.name||"")+'</div>'+
       '<div style="margin:8px 0;">'+spark(r.spark,340,54)+'</div>'+
-      row("regime", esc(r.regime))+row("regime conf", fmt(r.regime_conf,2))+
+      row("regime", esc(pretty(r.regime)))+row("regime conf", fmt(r.regime_conf,2))+
       row("ADX (trend strength)", fmt(r.adx,1)+(r.adx>=22?" — real trend":" — chop"))+
       row("extension (ATR from EMA20)", fmt(r.ext_atr,2))+
       row("above EMA50", r.above_ema50?"Y — above water":"N — below water", r.above_ema50?"green":"red")+
@@ -393,11 +436,11 @@ function regimeBoard(){
     html+='<div style="padding:13px 0;border-top:1px solid var(--hair);">'+
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;">'+
         '<div style="display:flex;align-items:center;gap:10px;"><span class="dot" style="background:'+accent+';"></span>'+
-          '<span style="font-weight:600;font-size:13px;">'+esc(r.instrument)+'</span>'+
-          '<span class="mono" style="font-size:10px;color:var(--slate);padding-left:9px;border-left:1px solid var(--line);">'+esc(r.strategy)+' · '+esc(r.timeframe)+'</span></div>'+
+          '<span style="font-weight:600;font-size:13px;">'+esc(pretty(r.instrument))+'</span>'+
+          '<span class="mono" style="font-size:10px;color:var(--slate);padding-left:9px;border-left:1px solid var(--line);">'+esc(pretty(r.strategy))+' · '+esc(r.timeframe)+'</span></div>'+
         '<span class="mono" style="font-size:10px;color:'+(r.venue==="ccxt"?C.wine:C.assist)+';">'+esc(r.venue)+'</span></div>'+
       '<div style="display:flex;align-items:center;gap:16px;">'+
-        '<div style="flex:1;"><div class="mono" style="font-size:12.5px;color:'+accent+';">'+esc(r.regime)+'</div></div>'+
+        '<div style="flex:1;"><div class="mono" style="font-size:12.5px;color:'+accent+';">'+esc(pretty(r.regime))+'</div></div>'+
         '<div style="width:120px;"><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span class="eyebrow">regime conf</span><span class="mono" style="font-size:10.5px;">'+fmt(r.conf,2)+'</span></div>'+
           '<div style="height:5px;background:rgba(20,38,63,0.08);border-radius:3px;overflow:hidden;"><div style="height:100%;width:'+Math.round((r.conf||0)*100)+'%;background:'+accent+';"></div></div></div></div>'+
       '<div style="margin-top:9px;" class="mono"><span style="color:var(--mute);">stance</span> <span style="color:'+stanceColor+';">'+esc(r.stance)+'</span>'+(r.hunting?' <span class="wine">· hunting</span>':'')+'</div></div>';
@@ -409,7 +452,7 @@ function positionsPanel(){
   const pos=Object.entries((SNAP.book||{}).positions||{});
   let html='<div style="display:flex;align-items:baseline;justify-content:space-between;margin:26px 0 12px;"><span class="sect-h">Open positions</span><span class="sect-meta">one fill model · bt = paper = live</span></div>';
   html+='<table><tr><th>instrument</th><th>side</th><th style="text-align:right;">entry</th><th style="text-align:right;">stop</th><th style="text-align:right;">qty</th></tr>';
-  html+= pos.length ? pos.map(([k,p])=>'<tr><td style="font-weight:600;">'+esc(k)+'</td><td>'+esc(p.side)+
+  html+= pos.length ? pos.map(([k,p])=>'<tr><td style="font-weight:600;">'+esc(pretty(k))+'</td><td>'+esc(pretty(p.side))+
     '</td><td style="text-align:right;">'+fmt(p.entry)+'</td><td style="text-align:right;" class="honey">'+fmt(p.stop)+
     '</td><td style="text-align:right;">'+esc(p.qty)+'</td></tr>').join("")
     : '<tr><td colspan="5" class="dim">flat — standing by is a position too</td></tr>';
@@ -448,7 +491,7 @@ function decisionJournal(){
     rows+='<div style="display:flex;gap:11px;padding:9px 0;border-top:1px solid var(--hair);">'+
       '<div class="mono" style="font-size:10.5px;color:var(--slate);width:84px;flex-shrink:0;">'+esc((t.ts||"").slice(5,16))+'</div>'+
       '<div style="width:3px;border-radius:2px;background:'+color+';flex-shrink:0;"></div>'+
-      '<div style="flex:1;min-width:0;"><div class="mono" style="font-size:11px;"><span style="font-weight:600;letter-spacing:.4px;color:'+color+';">'+kind+'</span> <span>'+esc(t.instrument)+'</span> <span class="slate">'+esc(t.side||"")+'</span></div>'+
+      '<div style="flex:1;min-width:0;"><div class="mono" style="font-size:11px;"><span style="font-weight:600;letter-spacing:.4px;color:'+color+';">'+kind+'</span> <span>'+esc(pretty(t.instrument))+'</span> <span class="slate">'+esc(pretty(t.side||""))+'</span></div>'+
       '<div class="mono" style="font-size:10.5px;color:var(--slate);margin-top:3px;">'+detail+'</div></div></div>';
   });
   if(!rows) rows='<div class="dim" style="padding:10px 0;">no theses journaled yet.</div>';
@@ -473,7 +516,7 @@ function renderTheses(){
     const verdict=t.risk_approved===null?'<span class="dim">—</span>':(t.risk_approved?'<span class="green">approved</span>':'<span class="red">vetoed</span>');
     const oc=t.outcome?'<span class="'+cls(t.outcome.pnl)+'">'+fmt(t.outcome.r,2)+'R ('+esc(t.outcome.exit_reason)+')</span>':'<span class="dim">open/none</span>';
     const detail="rationale:\\n- "+(t.rationale||[]).join("\\n- ")+"\\n\\ninvalidation: "+(t.invalidation||"—")+"\\n\\nscore: "+JSON.stringify(t.score_breakdown||{})+((t.risk_reasons&&t.risk_reasons.length)?("\\nveto: "+t.risk_reasons.join(", ")):"");
-    html+='<tr><td>'+esc((t.ts||"").slice(5,16))+'</td><td style="font-weight:600;">'+esc(t.instrument)+'</td><td>'+esc(t.side||"")+'</td><td>'+fmt(t.quality,2)+'</td><td>'+esc(t.regime||"—")+'</td><td>'+verdict+'</td><td>'+oc+'</td><td><details><summary>detail</summary><pre>'+esc(detail)+'</pre></details></td></tr>';
+    html+='<tr><td>'+esc((t.ts||"").slice(5,16))+'</td><td style="font-weight:600;">'+esc(pretty(t.instrument))+'</td><td>'+esc(pretty(t.side||""))+'</td><td>'+fmt(t.quality,2)+'</td><td>'+esc(pretty(t.regime||"—"))+'</td><td>'+verdict+'</td><td>'+oc+'</td><td><details><summary>detail</summary><pre>'+esc(detail)+'</pre></details></td></tr>';
   });
   return html+'</table>';
 }
@@ -482,7 +525,7 @@ function scanTable(rows){
   if(!rows||!rows.length) return '<div class="dim">no scan yet — runs with the 07:00 brief or keel scan.</div>';
   return '<table><tr><th>ticker</th><th>chart (60d)</th><th>regime</th><th>ADX</th><th>ext</th><th>&gt;EMA50</th><th style="text-align:right;">3m %</th><th style="text-align:right;">RS vs bench</th></tr>'+
     rows.map(r=>r.error?'<tr><td style="font-weight:600;">'+esc(r.ticker)+'</td><td colspan="7" class="dim">'+esc(r.error)+'</td></tr>'
-      :'<tr><td style="font-weight:600;">'+tk(r.ticker)+'</td><td>'+spark(r.spark)+'</td><td>'+esc(r.regime)+'</td><td>'+fmt(r.adx,1)+'</td><td>'+fmt(r.ext_atr,2)+'</td><td>'+(r.above_ema50?"Y":"N")+
+      :'<tr><td style="font-weight:600;">'+tk(r.ticker)+'</td><td>'+spark(r.spark)+'</td><td>'+esc(pretty(r.regime))+'</td><td>'+fmt(r.adx,1)+'</td><td>'+fmt(r.ext_atr,2)+'</td><td>'+(r.above_ema50?"Y":"N")+
       '</td><td style="text-align:right;" class="'+cls(r.ret_3m_pct)+'">'+fmt(r.ret_3m_pct,1)+'</td><td style="text-align:right;" class="'+cls(r.rs_3m_pct)+'">'+fmt(r.rs_3m_pct,1)+'</td></tr>'
     ).join("")+'</table>';
 }
@@ -703,7 +746,7 @@ function marketRows(rows){
   if(!rows||!rows.length) return '<tr><td colspan="7" class="dim">no data</td></tr>';
   return rows.filter(r=>!r.error).map(r=>
     '<tr><td style="font-weight:600;">'+tk(r.ticker)+'</td><td class="dim" style="color:var(--slate);">'+esc(r.name||"")+
-    '</td><td>'+spark(r.spark)+'</td><td>'+esc(r.regime)+
+    '</td><td>'+spark(r.spark)+'</td><td>'+esc(pretty(r.regime))+
     '</td><td class="'+cls(r.ret_3m_pct)+'">'+fmt(r.ret_3m_pct,1)+'</td>'+
     '<td>'+rsBar(r.rs_3m_pct)+' <span class="'+cls(r.rs_3m_pct)+'" style="font-size:11px;">'+fmt(r.rs_3m_pct,1)+'</span></td></tr>'
   ).join("");
@@ -747,7 +790,7 @@ function renderRebalance(){
   const cash=Math.max(0,remaining);
   let rowsHtml=computed.map(r=>{
     const barw=Math.min(100,r.wt);
-    return '<tr><td style="font-weight:600;">'+esc(r.instrument)+'</td><td>'+esc(r.regime)+
+    return '<tr><td style="font-weight:600;">'+esc(pretty(r.instrument))+'</td><td>'+esc(pretty(r.regime))+
       '</td><td>'+(r.favorable?'<span class="green">favorable</span>':'<span class="dim">off-regime</span>')+
       '</td><td style="text-align:right;">$'+fmt(r.alloc)+'</td>'+
       '<td style="width:160px;"><div style="display:flex;align-items:center;gap:6px;"><div style="flex:1;height:9px;background:rgba(20,38,63,0.07);border-radius:3px;"><div style="height:100%;width:'+barw+'%;background:var(--navy);border-radius:3px;"></div></div><span style="font-size:11px;">'+fmt(r.wt,0)+'%</span></div></td></tr>';
