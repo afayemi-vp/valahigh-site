@@ -523,7 +523,7 @@ function renderTheses(){
 
 function scanTable(rows){
   if(!rows||!rows.length) return '<div class="dim">no scan yet — runs with the 07:00 brief or keel scan.</div>';
-  return '<table><tr><th>ticker</th><th>chart (60d)</th><th>regime</th><th>ADX</th><th>ext</th><th>&gt;EMA50</th><th style="text-align:right;">3m %</th><th style="text-align:right;">RS vs bench</th></tr>'+
+  return '<table><tr><th>ticker</th><th>chart (60d)</th><th>regime</th><th title="Trend strength, 0-100. 22+ is a real trend.">ADX</th><th title="Extension in ATRs from the moving average. Big = overextended.">ext (ATRs)</th><th title="Above the 50-bar moving average?">&gt;EMA50</th><th style="text-align:right;" title="Price return over the last 3 months, in %.">3-mo return</th><th style="text-align:right;" title="Relative strength: 3-mo return minus the benchmark\\'s. Positive = outperforming.">RS vs benchmark</th></tr>'+
     rows.map(r=>r.error?'<tr><td style="font-weight:600;">'+esc(r.ticker)+'</td><td colspan="7" class="dim">'+esc(r.error)+'</td></tr>'
       :'<tr><td style="font-weight:600;">'+tk(r.ticker)+'</td><td>'+spark(r.spark)+'</td><td>'+esc(pretty(r.regime))+'</td><td>'+fmt(r.adx,1)+'</td><td>'+fmt(r.ext_atr,2)+'</td><td>'+(r.above_ema50?"Y":"N")+
       '</td><td style="text-align:right;" class="'+cls(r.ret_3m_pct)+'">'+fmt(r.ret_3m_pct,1)+'</td><td style="text-align:right;" class="'+cls(r.rs_3m_pct)+'">'+fmt(r.rs_3m_pct,1)+'</td></tr>'
@@ -772,7 +772,7 @@ function renderMarkets(){
     '<p class="dim">Playbook: leaders in a confirmed trend = momentum/trend longs on pullbacks; laggards reclaiming EMA50 with RS turning up = early rotation. Stretched (big +ext) = wait for a pullback, don\\'t chase.</p></div>'; }
   return '<div class="sect-h" style="margin-bottom:6px;">Global markets · trend &amp; relative strength'+gen+'</div>'+
     '<div class="sect-meta" style="margin-bottom:12px;">Where capital is flowing across economies and asset classes. RS = 3-month performance vs the world benchmark. Tap any ticker for its read.</div>'+insight+'<div style="height:14px;"></div>'+pick+
-    '<table><tr><th>ticker</th><th>market</th><th>chart (60d)</th><th>regime</th><th style="text-align:left;">3m %</th><th>relative strength</th></tr>'+marketRows(rows)+'</table>';
+    '<table><tr><th>ticker</th><th>market</th><th>chart (60d)</th><th>regime</th><th style="text-align:left;" title="Price return over the last 3 months, in %.">3-mo return</th><th title="Relative strength: this market\\'s 3-mo return minus the world benchmark\\'s. Positive = outperforming the world.">relative strength</th></tr>'+marketRows(rows)+'</table>';
 }
 
 function renderRebalance(){
