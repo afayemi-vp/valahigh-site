@@ -26,10 +26,23 @@ async function fromBlob() {
   return r.json();
 }
 
+function latestGistUrl(raw) {
+  // GitHub gist raw URLs come in two forms:
+  //   .../raw/<40-hex-commit-sha>/snapshot.json  — PINNED to one revision, goes
+  //                                                 stale forever as keel republishes
+  //   .../raw/snapshot.json                       — always the LATEST revision
+  // A pinned KOBEWOULD_SNAP_URL was the "snapshot 722 min old despite a fresh
+  // gist" bug: the env captured one revision's URL and never moved, so fromGist
+  // returned stale data and the dashboard fell back to the suspended blob.
+  // Strip the SHA so we always read the latest published snapshot.
+  return raw.replace(/\/raw\/[0-9a-f]{40}\//i, "/raw/");
+}
+
 async function fromGist() {
   // strip BOM/zero-width/whitespace — env values pasted via CLI can carry them
-  const url = env("KOBEWOULD_SNAP_URL").replace(/[\u{FEFF}\u{200B}\s]/gu, "");
-  if (!url) throw new Error("no fallback snapshot url configured");
+  const raw = env("KOBEWOULD_SNAP_URL").replace(/[\u{FEFF}\u{200B}\s]/gu, "");
+  if (!raw) throw new Error("no fallback snapshot url configured");
+  const url = latestGistUrl(raw);
   const r = await fetch(url + (url.includes("?") ? "&" : "?") + "t=" + Math.floor(Date.now() / 60000),
     { cache: "no-store" });
   if (!r.ok) throw new Error(`gist fetch ${r.status}`);
